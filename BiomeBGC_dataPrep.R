@@ -37,7 +37,7 @@ defineModule(sim, list(
                     ),
     defineParameter("CO2DataSource", "numeric|character", NA, NA, NA, 
                     paste("Three options:",
-                          "1) A numberic to set a constant atomospheric CO2 concentraion (in ppm),",
+                          "1) A numeric to set a constant atmospheric CO2 concentraion (in ppm),",
                           "2) The path to a single file with annual variable CO2 concentration",
                           "3) The name of a data source to extract variable CO2 concentration (TBD).")
                     ),
@@ -80,6 +80,10 @@ defineModule(sim, list(
                     "Should caching of events or module be used?")
   ),
   inputObjects = bindrows(
+    expectInput("studyArea", "SpatVector",
+                desc = paste("Polygons to use as the study area. Must be supplied by the user.",
+                             "One polygon per study site.")
+                ),
     expectsInput("ecophysiologicalConstants", "data.frame", 
                  desc = paste("Ecophysiological constants. The first column is the",
                               "description of the constants, the second column is",
@@ -93,7 +97,7 @@ defineModule(sim, list(
                               "for Tmax, Tmin, and Tday, `cm` for prcp, `Pa` for",
                               "VPD, `W/m^2` for srad, and `s` for daylen.")
                  ),
-    expectsInput("Co2concentration", "data.frame", 
+    expectsInput("CO2concentration", "data.frame", 
                  desc = paste("CO2 concentration for each year.")
                  )
   ),
@@ -199,9 +203,6 @@ Save <- function(sim) {
 ### template for plot events
 plotFun <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  sampleData <- data.frame("TheSample" = sample(1:10, replace = TRUE))
-  Plots(sampleData, fn = ggplotFn) # needs ggplot2
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
@@ -230,32 +231,36 @@ Event2 <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-  # Any code written here will be run during the simInit for the purpose of creating
-  # any objects required by this module and identified in the inputObjects element of defineModule.
-  # This is useful if there is something required before simulation to produce the module
-  # object dependencies, including such things as downloading default datasets, e.g.,
-  # downloadData("LCC2005", modulePath(sim)).
-  # Nothing should be created here that does not create a named object in inputObjects.
-  # Any other initiation procedures should be put in "init" eventType of the doEvent function.
-  # Note: the module developer can check if an object is 'suppliedElsewhere' to
-  # selectively skip unnecessary steps because the user has provided those inputObjects in the
-  # simInit call, or another module will supply or has supplied it. e.g.,
-  # if (!suppliedElsewhere('defaultColor', sim)) {
-  #   sim$map <- Cache(prepInputs, extractURL('map')) # download, extract, load file from url in sourceURL
-  # }
 
-  #cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
-  # ! ----- EDIT BELOW ----- ! #
+  if (!suppliedElsewhere('studyArea', sim)) {
+    stop("studyArea must be provided.")
+  }
+  
+  
+  if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
+    
+    
+  } else if (!is.na(P(sim)$epcDataSource)) {
+    message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
+  }
+  
+  if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
+    
+  } else if (!is.na(P(sim)$metDataSource)) {
+    message("Using provided meterological data, ignoring parameter metDataSource.")
+  }
+  
+  if (!suppliedElsewhere('CO2concentration', sim)) {
 
+    
+  } else if (!is.na(P(sim)$CO2DataSource)) {
+    message("Using provided CO2 concentration data, ignoring parameter CO2DataSource.")
+  }
+  
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
-}
-
-ggplotFn <- function(data, ...) {
-  ggplot2::ggplot(data, ggplot2::aes(TheSample)) +
-    ggplot2::geom_histogram(...)
 }
 
