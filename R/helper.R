@@ -1,5 +1,4 @@
 ### EPC helper function
-
 epcRead <- function(fileName){
   con <- file(fileName, open = "r")
   
@@ -140,3 +139,17 @@ metWrite <- function(metData, fileName, studyArea = "XXXX", dataSource = "XXXX")
   sink()
 }
 
+## CO2 helper function
+readCO2 <- function(fileName){
+  fileName <- "~/repos/BiomeBGCR/inst/inputs/co2/co2.txt"
+  co2Data <- read.table(fileName, col.names = c("year", "concentration"))
+  return(co2Data)
+}
+
+writeCO2 <- function(co2Data, fileName){
+  write.table(co2Data, 
+              file = fileName, 
+              sep = "\t", 
+              row.names = FALSE, 
+              col.names = FALSE)
+}
