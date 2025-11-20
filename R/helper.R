@@ -1,29 +1,49 @@
 ### EPC helper function
-epcRead <- function(fileName){
-  con <- file(fileName, open = "r")
+epcRead <- function(fileName, readValues = TRUE, readMeta = TRUE){
   
-  # Read header
-  epcHeader <- readLines(con, n = 1)
-  
-  # Read table
-  epcTable <- readLines(con)
-  
-  # Extract values
-  functionalType <- sub("^ECOPHYS\\s{2,}", "", epcHeader)
-  epcTableParsed <- sapply(epcTable, FUN = epcParseLine, USE.NAMES = FALSE)
-  
-  # Get into data.frame
-  epcDF <- data.frame(
-    description = epcTableParsed[1,],
-    unit = epcTableParsed[2,],
-    value = as.numeric(epcTableParsed[3,])
-  )
-  
-  # Add attributes
-  attr(epcDF, "title") <- "ECOPHYS"
-  attr(epcDF, "description") <- functionalType
-  
-  return(epcDF)
+  if (readValues | readMeta){
+    con <- file(fileName, open = "r")
+    
+    # Read header
+    epcHeader <- readLines(con, n = 1)
+    
+    # Read table
+    epcTable <- readLines(con)
+    
+    # Extract values
+    functionalType <- sub("^ECOPHYS\\s{2,}", "", epcHeader)
+    epcTableParsed <- sapply(epcTable, FUN = epcParseLine, USE.NAMES = FALSE)
+    
+    # If asked to read values and metadata columns, return as data.frame with attributes
+    if (readValues & readMeta){
+      epc <- data.frame(
+        description = epcTableParsed[1,],
+        unit = epcTableParsed[2,],
+        value = as.numeric(epcTableParsed[3,])
+      )
+      # Add attributes
+      attr(epc, "title") <- "ECOPHYS"
+      attr(epc, "description") <- functionalType
+      
+      
+    } else if (readValues & !readMeta){
+      # If asked to read values only, return a vector of values
+      epc <- as.numeric(epcTableParsed[3,])
+    } else if (!readValues & readMeta){
+      # If asked to read metadata columns only, return a data.frame with 2 columns
+      epc <- data.frame(
+        description = epcTableParsed[1,],
+        unit = epcTableParsed[2,]
+      )
+    }
+    
+  } else {
+    # If asked to read nothing, return a warning and an empty vector.
+    warning("readValues and readMeta are FALSE: returning an empty vector.")
+    epc <- c()
+    
+  }
+  return(epc)
 }
 
 epcParseLine <- function(epcLine){
