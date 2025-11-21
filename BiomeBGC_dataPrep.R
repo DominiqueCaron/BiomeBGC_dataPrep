@@ -113,11 +113,10 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-      ### check for more detailed object dependencies:
-      ### (use `checkObject` or similar)
 
-      # do stuff for this event
-      sim <- Init(sim)
+      sim <- prepareSpinupIni(sim)
+      
+      sim <- prepareIni(sim)
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "BiomeBGC_dataPrep", "plot")
@@ -149,47 +148,12 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
 
       # ! ----- STOP EDITING ----- ! #
     },
-    event1 = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "BiomeBGC_dataPrep", "templateEvent")
-
-      # ! ----- STOP EDITING ----- ! #
-    },
-    event2 = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "BiomeBGC_dataPrep", "templateEvent")
-
-      # ! ----- STOP EDITING ----- ! #
-    },
     warning(noEventWarning(sim))
   )
   return(invisible(sim))
 }
 
-### template initialization
-Init <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
 
-  # ! ----- STOP EDITING ----- ! #
-
-  return(invisible(sim))
-}
 ### template for save events
 Save <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
@@ -209,18 +173,88 @@ plotFun <- function(sim) {
 }
 
 ### template for your event1
-Event1 <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event1Test1 <- " this is test for event 1. " # for dummy unit test
-  # sim$event1Test2 <- 999 # for dummy unit test
-
-  # ! ----- STOP EDITING ----- ! #
+prepareSpinupIni <- function(sim) {
+  # First read the ini template
+  bbgcSpinup.ini <- iniRead("~/repos/BiomeBGCR/inst/inputs/ini/template.ini")
+  
+  # Set MET_INPUT section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
+                           file.path("inputs", "metdata", 
+                                     paste0(P(sim)$siteNames, ".mtc41")
+                                     )
+                           )
+  # Set RESTART section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(5,6), 
+                           file.path("inputs", "restart",
+                                    paste0(paste0(P(sim)$siteNames, ".restart"))
+                           )
+  )
+  
+  # Set TIME_DEFINE section
+  nyear <- length(unique(metData$year))
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, nyear) # number of simulation years
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, 6000) # max spinup years
+  
+  # Set CLIM_CHANGE section
+  cc_values <- c(0, # Offset for Tmax
+                 0, # Offset for Tmin
+                 1, # Multiplier for prcp
+                 1, # Multiplier for vpd
+                 1) # Multiplier for srad
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", c(1:5), cc_values)
+  
+  # Set CO2_CONTROL section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, 
+                           sim$CO2concentration[sim$year == start(sim), "concentration"])
+  
+  # Set SITE section
+  ## SHOULD GET FROM A SOURCE?
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1:10, P(sim)$siteConstant)
+  
+  # Set RAMP_NDEP section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:4, ) #TODO
+  
+  # Set EPC_FILE section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1:3, )
+  
+  # Set W_STATE section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:3, )
+  
+  # Set C_STATE section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "C_STATE", 1:12, )
+  
+  # Set N_STATE section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "N_STATE", 1:3, )
+  
+  # Set OUTPUT_CONTROL section
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1:7, )
+  
+  # Set DAILY_OUTPUT section
+  nDailyOuput <- length(P(sim)$dailyOutput)
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "DAILY_OUTPUT", 
+                           1:(nDailyOuput+1), 
+                           c(nDailyOuput,
+                             P(sim)$dailyOutput
+                           )
+  )
+  
+  # Set ANNUAL_OUTPUT section
+  nAnnOuput <- length(P(sim)$annualOutput)
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
+                           "ANNUAL_OUTPUT",
+                           1:(nAnnOuput + 1),
+                           c(nAnnOutput, P(sim)$annualOutput))
+  
   return(invisible(sim))
 }
 
 ### template for your event2
-Event2 <- function(sim) {
+prepareIni <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
   # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
   # sim$event2Test1 <- " this is test for event 2. " # for dummy unit test
@@ -241,21 +275,60 @@ Event2 <- function(sim) {
   
   
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
-    
-    
+    if(is.na(P(sim)$epcDataSource)){
+      stop("Either ecophysiologicalConstants or the parameter epcDataSource needs to be provided.")
+    } else {
+      dir.create(file.path(inputPath(sim)), "epc")
+      if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
+        fileName <- file.path(
+          system.file("inputs", package = "BiomeBGCR"),
+          "epc",
+          paste0(fileName, ".epc")
+        )
+      } else {
+        fileName <- P(sim)$epcDataSource
+      }
+      newFileName <- file.path(inputPath(sim), "epc", basename(fileName))
+      file.copy(fileName, 
+                newFileName,
+                overwrite = T
+                )
+      sim$ecophysiologicalConstants <- epcRead(newFileName)
+    }
   } else if (!is.na(P(sim)$epcDataSource)) {
     message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
   }
   
-  if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
-    
+  if (!suppliedElsewhere('meteorologicalData', sim)) {
+    if(is.na(P(sim)$metDataSource)){
+      stop("Either meteorologicalData or the parameter metDataSource needs to be provided.")
+    } else {
+      dir.create(file.path(inputPath(sim)), "metdata")
+      newFileName <- file.path(inputPath(sim), "metdata", basename(fileName))
+      file.copy(P(sim)$metDataSource, 
+                newFileName,
+                overwrite = T
+      )
+      sim$meteorologicalData <- metRead(newFileName)
+    }
   } else if (!is.na(P(sim)$metDataSource)) {
     message("Using provided meterological data, ignoring parameter metDataSource.")
   }
   
   if (!suppliedElsewhere('CO2concentration', sim)) {
-
-    
+    if(is.na(P(sim)$CO2DataSource)){
+      stop("Either CO2concentration or the parameter CO2DataSource needs to be provided.")
+    } else if (is.numeric(P(sim)$CO2DataSource)){
+      sim$CO2concentration <- P(sim)$CO2DataSource
+    } else {
+      dir.create(file.path(inputPath(sim)), "co2")
+      newFileName <- file.path(inputPath(sim), "co2", basename(fileName))
+      file.copy(P(sim)$CO2DataSource, 
+                newFileName,
+                overwrite = T
+      )
+      sim$CO2concentration <- CO2Read(newFileName)
+    }
   } else if (!is.na(P(sim)$CO2DataSource)) {
     message("Using provided CO2 concentration data, ignoring parameter CO2DataSource.")
   }

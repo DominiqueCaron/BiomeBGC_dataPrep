@@ -1,5 +1,13 @@
 ### EPC helper function
 epcRead <- function(fileName, readValues = TRUE, readMeta = TRUE){
+  # Get path to the default epc files if using one of them.
+  if(fileName %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
+    fileName <- file.path(
+      system.file("inputs", package = "BiomeBGCR"),
+      "epc",
+      paste0(fileName, ".epc")
+    )
+  }
   
   if (readValues | readMeta){
     con <- file(fileName, open = "r")
@@ -160,13 +168,13 @@ metWrite <- function(metData, fileName, studyArea = "XXXX", dataSource = "XXXX")
 }
 
 ## CO2 helper function
-readCO2 <- function(fileName){
+CO2Read <- function(fileName){
   fileName <- "~/repos/BiomeBGCR/inst/inputs/co2/co2.txt"
   co2Data <- read.table(fileName, col.names = c("year", "concentration"))
   return(co2Data)
 }
 
-writeCO2 <- function(co2Data, fileName){
+CO2write <- function(co2Data, fileName){
   write.table(co2Data, 
               file = fileName, 
               sep = "\t", 
