@@ -28,19 +28,19 @@ defineModule(sim, list(
                           "2) One of the Biome-BGC default epc files (e.g., \"enf\")",
                           "A single default can be used or one per study site.",
                           "3) The source from which ecophysiological constants are extracted (TBD).")
-                    ),
+    ),
     defineParameter("metDataSource", "character", NA, NA, NA, 
                     paste("Two options:",
                           "1) The path(s) to the meteorological file(s).",
                           "There can be a single file, or one per study site.",
                           "2) Source of the meteorological data. PRISM? daymet? CHELSA (TBD)?")
-                    ),
+    ),
     defineParameter("CO2DataSource", "numeric|character", NA, NA, NA, 
                     paste("Three options:",
                           "1) A numeric to set a constant atmospheric CO2 concentraion (in ppm),",
                           "2) The path to a single file with annual variable CO2 concentration",
                           "3) The name of a data source to extract variable CO2 concentration (TBD).")
-                    ),
+    ),
     defineParameter("NDepositionLevel", "numeric", c(0, 2099, 0.0001), NA, NA, 
                     paste("A 3-number vector:",
                           "1) Keep nitrogen deposition level constant (0) or vary according to the time trajectory of CO2 mole fractions (1).",
@@ -94,7 +94,7 @@ defineModule(sim, list(
                           "9: soil carbon, medium pool (kgC/m2)",
                           "10: soil carbon, slow pool (kgC/m2)",
                           "11: soil carbon, slowest pool (kgC/m2)"
-                          )
+                    )
     ),
     defineParameter("nitrogenState", "numeric", c(0, 0), NA, NA, 
                     paste("2-number vector for initial nitrogen conditions:",
@@ -117,7 +117,7 @@ defineModule(sim, list(
                     "This describes the simulation time interval between save events."),
     defineParameter(".studyAreaName", "character", NA, NA, NA,
                     "Human-readable name for the study area used - e.g., a hash of the study",
-                          "area obtained using `reproducible::studyAreaName()`"),
+                    "area obtained using `reproducible::studyAreaName()`"),
     ## .seed is optional: `list('init' = 123)` will `set.seed(123)` for the `init` event only.
     defineParameter(".seed", "list", list(), NA, NA,
                     "Named list of seeds to use for each event (names)."),
@@ -126,25 +126,25 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     expectsInput("studyArea", "SpatVector",
-                desc = paste("Polygons to use as the study area. Must be supplied by the user.",
-                             "One polygon per study site.")
-                ),
+                 desc = paste("Polygons to use as the study area. Must be supplied by the user.",
+                              "One polygon per study site.")
+    ),
     expectsInput("ecophysiologicalConstants", "data.frame", 
                  desc = paste("Ecophysiological constants. The first column is the",
                               "description of the constants, the second column is",
                               "the unit, and the following are the values of the constant.",
                               "There are either a single column if all study sites share",
                               "the same constant of one column per sites.")
-                 ),
+    ),
     expectsInput("meteorologicalData", "list", 
                  desc = paste("List of data.frames with the meteorological data",
                               "for each study site. The units are `deg C`",
                               "for Tmax, Tmin, and Tday, `cm` for prcp, `Pa` for",
                               "VPD, `W/m^2` for srad, and `s` for daylen.")
-                 ),
+    ),
     expectsInput("CO2concentration", "data.frame", 
                  desc = paste("CO2 concentration for each year.")
-                 )
+    )
   ),
   outputObjects = bindrows(
     createsOutput(objectName = "bbgcSpinup.ini", objectClass = "character", desc = paste("Biome-BGC initialization files for the spinup.", 
@@ -158,11 +158,11 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
-
+      
       sim <- prepareSpinupIni(sim)
       
       sim <- prepareIni(sim)
-
+      
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "BiomeBGC_dataPrep", "plot")
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "BiomeBGC_dataPrep", "save")
@@ -170,27 +170,27 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
     plot = {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
-
+      
       plotFun(sim) # example of a plotting function
       # schedule future event(s)
-
+      
       # e.g.,
       #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "BiomeBGC_dataPrep", "plot")
-
+      
       # ! ----- STOP EDITING ----- ! #
     },
     save = {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
-
+      
       # e.g., call your custom functions/methods here
       # you can define your own methods below this `doEvent` function
-
+      
       # schedule future event(s)
-
+      
       # e.g.,
       # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "BiomeBGC_dataPrep", "save")
-
+      
       # ! ----- STOP EDITING ----- ! #
     },
     warning(noEventWarning(sim))
@@ -204,7 +204,7 @@ Save <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
   # do stuff for this event
   sim <- saveFiles(sim)
-
+  
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
@@ -212,7 +212,7 @@ Save <- function(sim) {
 ### template for plot events
 plotFun <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
-
+  
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
@@ -223,15 +223,15 @@ prepareSpinupIni <- function(sim) {
   
   # Set MET_INPUT section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
-                           file.path(inputPath(sim), "metdata", basename(basename(P(sim)$metDataSource)))
-                           )
+                           file.path("inputs", "metdata", basename(basename(P(sim)$metDataSource)))
+  )
   # Set RESTART section
   # TODO: make sure that the 
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                            "RESTART",
                            c(5, 6),
-                           file.path(inputPath(sim), "restart", paste0(P(sim)$siteNames, ".restart")))
+                           file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
   
   # Set TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
@@ -281,7 +281,7 @@ prepareSpinupIni <- function(sim) {
     fileName <- basename(P(sim)$epcDataSource)
   }
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1, 
-                           file.path(inputPath(sim), "epc", fileName))
+                           file.path("inputs", "epc", fileName))
   
   # Set W_STATE section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:2, P(sim)$waterState)
@@ -295,7 +295,7 @@ prepareSpinupIni <- function(sim) {
   # Set OUTPUT_CONTROL section
   # TODO make sure this is what we want for the spinup
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1, 
-                           file.path(outputPath(sim), P(sim)$siteNames, "_spinup"))
+                           file.path("ouputs", P(sim)$siteNames, "_spinup"))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 2:6, 
                            c(0, # 1 = write daily output   0 = no daily output
                              0, # 1 = monthly avg of daily variables  0 = no monthly avg
@@ -332,8 +332,8 @@ prepareIni <- function(sim) {
   
   # Change the RESTART section
   bbgc.ini <- iniSet(bbgc.ini, "RESTART", c(1:4), c(1, 0, 0, 0))
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path(inputPath(sim), "restart", paste0(P(sim)$siteNames, ".restart")))
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 6, file.path(inputPath(sim), "restart", paste0(P(sim)$siteNames, "_out.restart")))
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 6, file.path("inputs", "restart", paste0(P(sim)$siteNames, "_out.restart")))
   
   # Change the TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
@@ -348,7 +348,7 @@ prepareIni <- function(sim) {
     bbgc.ini <- iniSet(bbgc.ini,
                        "CO2_CONTROL",
                        3,
-                       file.path(inputPath(sim), "co2", basename(P(sim)$CO2DataSource)))
+                       file.path("inputs", "co2", basename(P(sim)$CO2DataSource)))
   }
   
   # Change the RAMP_NDEP section
@@ -358,7 +358,7 @@ prepareIni <- function(sim) {
   bbgc.ini <- iniSet(bbgc.ini,
                      "OUTPUT_CONTROL",
                      1,
-                     file.path(outputPath(sim), P(sim)$siteNames))
+                     file.path("outputs", P(sim)$siteNames))
   bbgc.ini <- iniSet(bbgc.ini, "OUTPUT_CONTROL", 2:6, c(
     1, # 1 = write daily output   0 = no daily output
     1, # 1 = monthly avg of daily variables  0 = no monthly avg
@@ -375,7 +375,7 @@ prepareIni <- function(sim) {
 .inputObjects <- function(sim) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
-
+  
   if (!suppliedElsewhere('studyArea', sim)) {
     stop("studyArea must be provided.")
   }
@@ -399,7 +399,7 @@ prepareIni <- function(sim) {
       file.copy(fileName, 
                 newFileName,
                 overwrite = T
-                )
+      )
       sim$ecophysiologicalConstants <- epcRead(newFileName)
     }
   } else if (!is.na(P(sim)$epcDataSource)) {
