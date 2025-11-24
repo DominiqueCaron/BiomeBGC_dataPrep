@@ -51,7 +51,7 @@ defineModule(sim, list(
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables.")
     ),
-    defineParameter("annualOutput", "numeric", c(1,2,3), NA, NA, 
+    defineParameter("annualOutput", "numeric", c(545, 636, 637, 638, 639, 307), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables.")
     ),
@@ -76,7 +76,32 @@ defineModule(sim, list(
                           "8: annual rate of atmospheric nitrogen deposition",
                           "9: annual rate of symbiotic+asymbiotic nitrogen fixation")
     ),
-    defineParameter("siteNames", "character", NA, NA, NA, 
+    defineParameter("waterState", "numeric", c(0, 0.5), NA, NA, 
+                    paste("2-number vector for initial water conditions:",
+                          "1: initial snowpack water content (kg/m2)",
+                          "2: intial soil water content as a proportion of saturation (DIM)")
+    ),
+    defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA, 
+                    paste("11-number vector for initial carbon conditions:",
+                          "1: peak leaf carbon to be attained during the first simulation year (kgC/m2)",
+                          "2: peak stem carbon to be attained during the first year (kgC/m2)",
+                          "3: initial coarse woody debris carbon (dead trees, standing or fallen) (kgC/m2)",
+                          "4: initial litter carbon, labile pool (kgC/m2)",
+                          "5: initial litter carbon, unshielded cellulose pool (kgC/m2)",
+                          "6: initial litter carbon, shielded cellulose pool (kgC/m2)",
+                          "7: initial litter carbon, lignin pool (kgC/m2)",
+                          "8: soil carbon, fast pool (kgC/m2)",
+                          "9: soil carbon, medium pool (kgC/m2)",
+                          "10: soil carbon, slow pool (kgC/m2)",
+                          "11: soil carbon, slowest pool (kgC/m2)"
+                          )
+    ),
+    defineParameter("nitrogenState", "numeric", c(0, 0), NA, NA, 
+                    paste("2-number vector for initial nitrogen conditions:",
+                          "1: litter nitrogen associated with labile litter carbon pool (kgN/m2)",
+                          "2: soil mineral nitrogen pool (kgN/m2)")
+    ),
+    defineParameter("siteNames", "character", "site1", NA, NA, 
                     paste("The names of the study sites. If not provided, a number from",
                           "1 to the number of study sites will be used.")
     ),
@@ -267,14 +292,24 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "N_STATE", 1:2, P(sim)$nitrogenState)
   
   # Set OUTPUT_CONTROL section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1:7, P(sim)$outputControl)
+  # TODO make sure this is what we want for the spinup
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1, 
+                           paste0("outputs/", P(sim)$siteNames, "_spinup"))
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 2:6, 
+                           c(0, # 1 = write daily output   0 = no daily output
+                             0, # 1 = monthly avg of daily variables  0 = no monthly avg
+                             0, # 1 = annual avg of daily variables   0 = no annual avg
+                             1, # 1 = write annual output  0 = no annual output
+                             0, # 1 = write disturbance text output  0 = no disturbance output
+                             1)) # for on-screen progress indicator
   
   # Set DAILY_OUTPUT section
-  nDailyOuput <- length(P(sim)$dailyOutput)
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
-                           "DAILY_OUTPUT",
-                           1:(nDailyOuput + 1),
-                           c(nDailyOuput, P(sim)$dailyOutput))
+  # DOES NOT NEED TO BE CHANGED FOR THE SPINUP (not reported)
+  # nDailyOuput <- length(P(sim)$dailyOutput)
+  # bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
+  #                          "DAILY_OUTPUT",
+  #                          1:(nDailyOuput + 1),
+  #                          c(nDailyOuput, P(sim)$dailyOutput))
   
   # Set ANNUAL_OUTPUT section
   nAnnOuput <- length(P(sim)$annualOutput)
