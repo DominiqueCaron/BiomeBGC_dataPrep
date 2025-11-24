@@ -22,7 +22,7 @@ defineModule(sim, list(
   reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/BiomeBGCR@development"),
   parameters = bindrows(
     defineParameter("epcDataSource", "character", NA, NA, NA, 
-                    paste("Three options:"
+                    paste("Three options:",
                           "1) The path(s) to the ecophysiological constants file(s).",
                           "There can be a single file, or one per study site.",
                           "2) One of the Biome-BGC default epc files (e.g., \"enf\")",
@@ -32,7 +32,7 @@ defineModule(sim, list(
     defineParameter("metDataSource", "character", NA, NA, NA, 
                     paste("Two options:",
                           "1) The path(s) to the meteorological file(s).",
-                          "There can be a single file, or one per study site."
+                          "There can be a single file, or one per study site.",
                           "2) Source of the meteorological data. PRISM? daymet? CHELSA (TBD)?")
                     ),
     defineParameter("CO2DataSource", "numeric|character", NA, NA, NA, 
@@ -80,7 +80,7 @@ defineModule(sim, list(
                     "Should caching of events or module be used?")
   ),
   inputObjects = bindrows(
-    expectInput("studyArea", "SpatVector",
+    expectsInput("studyArea", "SpatVector",
                 desc = paste("Polygons to use as the study area. Must be supplied by the user.",
                              "One polygon per study site.")
                 ),
@@ -174,6 +174,7 @@ plotFun <- function(sim) {
 
 ### template for your event1
 prepareSpinupIni <- function(sim) {
+  browser()
   # First read the ini template
   bbgcSpinup.ini <- iniRead("~/repos/BiomeBGCR/inst/inputs/ini/template.ini")
   
@@ -214,34 +215,33 @@ prepareSpinupIni <- function(sim) {
   
   # Set SITE section
   ## SHOULD GET FROM A SOURCE?
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1:10, P(sim)$siteConstant)
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1:9, P(sim)$siteConstants)
   
   # Set RAMP_NDEP section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:4, ) #TODO
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, P(sim)$Ndeposition) #TODO
   
   # Set EPC_FILE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1:3, )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1, 
+                           )
   
   # Set W_STATE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:3, )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:2, P(sim)$waterState)
   
   # Set C_STATE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "C_STATE", 1:12, )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "C_STATE", 1:11, P(sim)$carbonState)
   
   # Set N_STATE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "N_STATE", 1:3, )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "N_STATE", 1:2, P(sim)$nitrogenState)
   
   # Set OUTPUT_CONTROL section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1:7, )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1:7, P(sim)$outputControl)
   
   # Set DAILY_OUTPUT section
   nDailyOuput <- length(P(sim)$dailyOutput)
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "DAILY_OUTPUT", 
-                           1:(nDailyOuput+1), 
-                           c(nDailyOuput,
-                             P(sim)$dailyOutput
-                           )
-  )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
+                           "DAILY_OUTPUT",
+                           1:(nDailyOuput + 1),
+                           c(nDailyOuput, P(sim)$dailyOutput))
   
   # Set ANNUAL_OUTPUT section
   nAnnOuput <- length(P(sim)$annualOutput)
@@ -265,7 +265,7 @@ prepareIni <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-
+browser()
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
@@ -278,12 +278,12 @@ prepareIni <- function(sim) {
     if(is.na(P(sim)$epcDataSource)){
       stop("Either ecophysiologicalConstants or the parameter epcDataSource needs to be provided.")
     } else {
-      dir.create(file.path(inputPath(sim)), "epc")
+      dir.create(file.path(inputPath(sim), "epc"), showWarnings = FALSE)
       if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
         fileName <- file.path(
           system.file("inputs", package = "BiomeBGCR"),
           "epc",
-          paste0(fileName, ".epc")
+          paste0(P(sim)$epcDataSource, ".epc")
         )
       } else {
         fileName <- P(sim)$epcDataSource
@@ -303,8 +303,8 @@ prepareIni <- function(sim) {
     if(is.na(P(sim)$metDataSource)){
       stop("Either meteorologicalData or the parameter metDataSource needs to be provided.")
     } else {
-      dir.create(file.path(inputPath(sim)), "metdata")
-      newFileName <- file.path(inputPath(sim), "metdata", basename(fileName))
+      dir.create(file.path(inputPath(sim), "metdata"), showWarnings = FALSE)
+      newFileName <- file.path(inputPath(sim), "metdata", basename(P(sim)$metDataSource))
       file.copy(P(sim)$metDataSource, 
                 newFileName,
                 overwrite = T
@@ -321,8 +321,8 @@ prepareIni <- function(sim) {
     } else if (is.numeric(P(sim)$CO2DataSource)){
       sim$CO2concentration <- P(sim)$CO2DataSource
     } else {
-      dir.create(file.path(inputPath(sim)), "co2")
-      newFileName <- file.path(inputPath(sim), "co2", basename(fileName))
+      dir.create(file.path(inputPath(sim), "co2"), showWarnings = FALSE)
+      newFileName <- file.path(inputPath(sim), "co2", basename(P(sim)$CO2DataSource))
       file.copy(P(sim)$CO2DataSource, 
                 newFileName,
                 overwrite = T

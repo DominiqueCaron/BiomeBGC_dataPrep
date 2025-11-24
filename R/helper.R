@@ -44,7 +44,7 @@ epcRead <- function(fileName, readValues = TRUE, readMeta = TRUE){
         unit = epcTableParsed[2,]
       )
     }
-    
+    close(con)
   } else {
     # If asked to read nothing, return a warning and an empty vector.
     warning("readValues and readMeta are FALSE: returning an empty vector.")
