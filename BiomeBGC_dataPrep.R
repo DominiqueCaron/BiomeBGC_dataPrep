@@ -47,7 +47,7 @@ defineModule(sim, list(
                           "2) The reference year for N deposition (only used when N-deposition varies).",
                           "3) Industrial N deposition value.")
     ),
-    defineParameter("dailyOutput", "numeric", c(1,2,3), NA, NA, 
+    defineParameter("dailyOutput", "numeric", c(20, 21, 38, 40, 42, 43, 44, 70, 509, 528, 620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639, 579), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables.")
     ),
@@ -218,13 +218,12 @@ plotFun <- function(sim) {
 }
 
 prepareSpinupIni <- function(sim) {
-  browser()
   # First read the ini template
   bbgcSpinup.ini <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
   
   # Set MET_INPUT section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
-                           file.path("inputs", "metdata", basename(basename(P(sim)$metDataSource)))
+                           file.path(inputPath(sim), "metdata", basename(basename(P(sim)$metDataSource)))
                            )
   # Set RESTART section
   # TODO: make sure that the 
@@ -232,7 +231,7 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                            "RESTART",
                            c(5, 6),
-                           file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
+                           file.path(inputPath(sim), "restart", paste0(P(sim)$siteNames, ".restart")))
   
   # Set TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
@@ -243,8 +242,7 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
   
   # Set CLIM_CHANGE section
-  cc_values <- P(sim)$climateChangeOptions
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", c(1:5), cc_values)
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CLIM_CHANGE", c(1:5), P(sim)$climateChangeOptions)
   
   # Set CO2_CONTROL section
   # TODO: make sure that co2 is always constant for the spinup. If so, which year?
@@ -260,7 +258,12 @@ prepareSpinupIni <- function(sim) {
   
   # Set SITE section
   # TODO: Get from an external source
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1:9, P(sim)$siteConstants)
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(1,5), P(sim)$siteConstants[c(1,5)])
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4), P(sim)$siteConstants[c(2:4)])
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(8:9), format(P(sim)$siteConstants[c(8:9)], scientific = FALSE, trim = TRUE))
+  
   
   # Set RAMP_NDEP section
   # TODO: Make sure that it is always constant during spinup
@@ -268,7 +271,7 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
                            c(0, #0 = constant deposition
                              P(sim)$NDepositionLevel[2],
-                             P(sim)$NDepositionLevel[3]
+                             format(P(sim)$NDepositionLevel[3], scientific = FALSE, trim = TRUE)
                            ))
   
   # Set EPC_FILE section
@@ -278,7 +281,7 @@ prepareSpinupIni <- function(sim) {
     fileName <- basename(P(sim)$epcDataSource)
   }
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1, 
-                           file.path("inputs", "epc", fileName))
+                           file.path(inputPath(sim), "epc", fileName))
   
   # Set W_STATE section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:2, P(sim)$waterState)
@@ -292,28 +295,30 @@ prepareSpinupIni <- function(sim) {
   # Set OUTPUT_CONTROL section
   # TODO make sure this is what we want for the spinup
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1, 
-                           paste0("outputs/", P(sim)$siteNames, "_spinup"))
+                           file.path(outputPath(sim), P(sim)$siteNames, "_spinup"))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 2:6, 
                            c(0, # 1 = write daily output   0 = no daily output
                              0, # 1 = monthly avg of daily variables  0 = no monthly avg
                              0, # 1 = annual avg of daily variables   0 = no annual avg
                              1, # 1 = write annual output  0 = no annual output
-                             0, # 1 = write disturbance text output  0 = no disturbance output
                              1)) # for on-screen progress indicator
   
   # Set DAILY_OUTPUT section
+  # TODO Get the comments right
   nDailyOuput <- length(P(sim)$dailyOutput)
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                            "DAILY_OUTPUT",
                            1:(nDailyOuput + 1),
                            c(nDailyOuput, P(sim)$dailyOutput))
+  bbgcSpinup.ini$DAILY_OUTPUT <- bbgcSpinup.ini$DAILY_OUTPUT[c(1:(2+nDailyOuput)),]
   
   # Set ANNUAL_OUTPUT section
   nAnnOuput <- length(P(sim)$annualOutput)
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                            "ANNUAL_OUTPUT",
                            1:(nAnnOuput + 1),
-                           c(nAnnOutput, P(sim)$annualOutput))
+                           c(nAnnOuput, P(sim)$annualOutput))
+  bbgcSpinup.ini$ANNUAL_OUTPUT <- bbgcSpinup.ini$ANNUAL_OUTPUT[c(1:(2+nAnnOuput)),]
   
   # add to simList
   sim$bbgcSpinup.ini <- bbgcSpinup.ini
@@ -323,12 +328,12 @@ prepareSpinupIni <- function(sim) {
 
 prepareIni <- function(sim) {
   # Start from the spinup ini
-  bbgc.ini <- bbgcSpinup.ini
+  bbgc.ini <- sim$bbgcSpinup.ini
   
   # Change the RESTART section
   bbgc.ini <- iniSet(bbgc.ini, "RESTART", c(1:4), c(1, 0, 0, 0))
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 6, file.path("inputs", "restart", paste0(P(sim)$siteNames, "_out.restart")))
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path(inputPath(sim), "restart", paste0(P(sim)$siteNames, ".restart")))
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 6, file.path(inputPath(sim), "restart", paste0(P(sim)$siteNames, "_out.restart")))
   
   # Change the TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
@@ -353,13 +358,12 @@ prepareIni <- function(sim) {
   bbgc.ini <- iniSet(bbgc.ini,
                      "OUTPUT_CONTROL",
                      1,
-                     paste0("outputs/", P(sim)$siteNames))
+                     file.path(outputPath(sim), P(sim)$siteNames))
   bbgc.ini <- iniSet(bbgc.ini, "OUTPUT_CONTROL", 2:6, c(
     1, # 1 = write daily output   0 = no daily output
     1, # 1 = monthly avg of daily variables  0 = no monthly avg
     1, # 1 = annual avg of daily variables   0 = no annual avg
     1, # 1 = write annual output  0 = no annual output
-    0, # 1 = write disturbance text output  0 = no disturbance output
     1  # for on-screen progress indicator
   )) 
   
