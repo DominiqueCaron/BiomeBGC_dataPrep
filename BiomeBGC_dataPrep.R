@@ -41,12 +41,11 @@ defineModule(sim, list(
                           "2) The path to a single file with annual variable CO2 concentration",
                           "3) The name of a data source to extract variable CO2 concentration (TBD).")
                     ),
-    defineParameter("NDepositionLevel", "numeric", 0, NA, NA, 
-                    paste("Either `0` or a 2-number vector. If `0`, the nitrogen",
-                          "deposition level remains constant.",
-                          "If a 2-number vector, the nitrogen deposition levels",
-                          "vary according to the time trajectory of CO2 mole fractions.",
-                          "See Biome-BGC documentation.")
+    defineParameter("NDepositionLevel", "numeric", c(0, 2099, 0.0001), NA, NA, 
+                    paste("A 3-number vector:",
+                          "1) Keep nitrogen deposition level constant (0) or vary according to the time trajectory of CO2 mole fractions (1).",
+                          "2) The reference year for N deposition (only used when N-deposition varies).",
+                          "3) Industrial N deposition value.")
     ),
     defineParameter("dailyOutput", "numeric", c(1,2,3), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
@@ -55,6 +54,27 @@ defineModule(sim, list(
     defineParameter("annualOutput", "numeric", c(1,2,3), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables.")
+    ),
+    defineParameter("maxSpinupYears", "integer", 6000L, NA, NA, 
+                    paste("The maximum number of simulation for a spinup run.")
+    ),
+    defineParameter("climateChangeOptions", "numberic", c(0, 0, 1, 1, 1), NA, NA, 
+                    paste("Entries in the CLIMATE_CHANGE section of the ini file.",
+                          "The entries are: offset for Tmax, offset for Tmin",
+                          "multiplier for prcp, multiplier for vpd, and muliplier",
+                          "for srad.")
+    ),
+    defineParameter("siteConstants", "numeric", c(1, 30, 50, 20, 977, 46.8, 0.2, 0.0001, 0.0008), NA, NA, 
+                    paste("A vector with site information:",
+                          "1: effective soil depth",
+                          "2: sand percentage",
+                          "3: silt percentage",
+                          "4: clay percentage",
+                          "5: site elevation in meters", 
+                          "6: site latitude in decimal degrees",
+                          "7: site shortwave albedo",
+                          "8: annual rate of atmospheric nitrogen deposition",
+                          "9: annual rate of symbiotic+asymbiotic nitrogen fixation")
     ),
     defineParameter("siteNames", "character", NA, NA, NA, 
                     paste("The names of the study sites. If not provided, a number from",
@@ -176,15 +196,14 @@ plotFun <- function(sim) {
 prepareSpinupIni <- function(sim) {
   browser()
   # First read the ini template
-  bbgcSpinup.ini <- iniRead("~/repos/BiomeBGCR/inst/inputs/ini/template.ini")
+  bbgcSpinup.ini <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
   
   # Set MET_INPUT section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
-                           file.path("inputs", "metdata", 
-                                     paste0(P(sim)$siteNames, ".mtc41")
-                                     )
+                           file.path("inputs", "metdata", basename(basename(P(sim)$metDataSource)))
                            )
   # Set RESTART section
+  # TODO: make sure that the 
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(5,6), 
                            file.path("inputs", "restart",
@@ -193,36 +212,50 @@ prepareSpinupIni <- function(sim) {
   )
   
   # Set TIME_DEFINE section
-  nyear <- length(unique(metData$year))
+  nyear <- length(unique(sim$meteorologicalData$year))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, nyear) # number of simulation years
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, end(sim) - start(sim)) # number of simulation years
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, 6000) # max spinup years
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
   
   # Set CLIM_CHANGE section
-  cc_values <- c(0, # Offset for Tmax
-                 0, # Offset for Tmin
-                 1, # Multiplier for prcp
-                 1, # Multiplier for vpd
-                 1) # Multiplier for srad
+  cc_values <- P(sim)$climateChangeOptions
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", c(1:5), cc_values)
   
   # Set CO2_CONTROL section
+  # TODO: make sure that co2 is always constant for the spinup. If so, which year?
+  # TODO: Get from external source
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, 
-                           sim$CO2concentration[sim$year == start(sim), "concentration"])
+  if (is.numeric(P(sim)$CO2DataSource)) {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, 
+                             P(sim)$CO2DataSource)
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, 
+                             sim$CO2concentration[sim$CO2concentration$year == start(sim), "concentration"])
+  }
   
   # Set SITE section
-  ## SHOULD GET FROM A SOURCE?
+  # TODO: Get from an external source
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1:9, P(sim)$siteConstants)
   
   # Set RAMP_NDEP section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, P(sim)$Ndeposition) #TODO
+  # TODO: Make sure that it is always constant during spinup
+  # TODO: Get from external source
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
+                           c(0, #0 = constant deposition
+                             P(sim)$NDepositionLevel[2],
+                             P(sim)$NDepositionLevel[3]
+                           ))
   
   # Set EPC_FILE section
+  if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
+    fileName <- paste0(P(sim)$epcDataSource, ".epc")
+  } else {
+    fileName <- basename(P(sim)$epcDataSource)
+  }
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1, 
-                           )
+                           file.path("inputs", "epc", fileName))
   
   # Set W_STATE section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:2, P(sim)$waterState)
@@ -265,7 +298,6 @@ prepareIni <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-browser()
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
