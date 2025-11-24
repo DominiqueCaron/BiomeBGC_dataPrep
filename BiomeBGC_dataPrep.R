@@ -217,7 +217,6 @@ plotFun <- function(sim) {
   return(invisible(sim))
 }
 
-### template for your event1
 prepareSpinupIni <- function(sim) {
   browser()
   # First read the ini template
@@ -230,11 +229,10 @@ prepareSpinupIni <- function(sim) {
   # Set RESTART section
   # TODO: make sure that the 
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(5,6), 
-                           file.path("inputs", "restart",
-                                    paste0(paste0(P(sim)$siteNames, ".restart"))
-                           )
-  )
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
+                           "RESTART",
+                           c(5, 6),
+                           file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
   
   # Set TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
@@ -304,12 +302,11 @@ prepareSpinupIni <- function(sim) {
                              1)) # for on-screen progress indicator
   
   # Set DAILY_OUTPUT section
-  # DOES NOT NEED TO BE CHANGED FOR THE SPINUP (not reported)
-  # nDailyOuput <- length(P(sim)$dailyOutput)
-  # bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
-  #                          "DAILY_OUTPUT",
-  #                          1:(nDailyOuput + 1),
-  #                          c(nDailyOuput, P(sim)$dailyOutput))
+  nDailyOuput <- length(P(sim)$dailyOutput)
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
+                           "DAILY_OUTPUT",
+                           1:(nDailyOuput + 1),
+                           c(nDailyOuput, P(sim)$dailyOutput))
   
   # Set ANNUAL_OUTPUT section
   nAnnOuput <- length(P(sim)$annualOutput)
@@ -318,17 +315,56 @@ prepareSpinupIni <- function(sim) {
                            1:(nAnnOuput + 1),
                            c(nAnnOutput, P(sim)$annualOutput))
   
+  # add to simList
+  sim$bbgcSpinup.ini <- bbgcSpinup.ini
+  
   return(invisible(sim))
 }
 
-### template for your event2
 prepareIni <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event2Test1 <- " this is test for event 2. " # for dummy unit test
-  # sim$event2Test2 <- 777  # for dummy unit test
-
-  # ! ----- STOP EDITING ----- ! #
+  # Start from the spinup ini
+  bbgc.ini <- bbgcSpinup.ini
+  
+  # Change the RESTART section
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", c(1:4), c(1, 0, 0, 0))
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
+  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 6, file.path("inputs", "restart", paste0(P(sim)$siteNames, "_out.restart")))
+  
+  # Change the TIME_DEFINE section
+  nyear <- length(unique(sim$meteorologicalData$year))
+  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
+  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 2, end(sim) - start(sim)) # number of simulation years
+  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
+  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
+  
+  # Change the CO2 section
+  if (!is.numeric(P(sim)$CO2DataSource)) {
+    bbgc.ini <- iniSet(bbgc.ini, "CO2_CONTROL", 1, 1)
+    bbgc.ini <- iniSet(bbgc.ini,
+                       "CO2_CONTROL",
+                       3,
+                       file.path(inputPath(sim), "co2", basename(P(sim)$CO2DataSource)))
+  }
+  
+  # Change the RAMP_NDEP section
+  bbgc.ini <- iniSet(bbgc.ini, "RAMP_NDEP", 1, P(sim)$NDepositionLevel[1])
+  
+  # Change OUTPUT_CONTROL section
+  bbgc.ini <- iniSet(bbgc.ini,
+                     "OUTPUT_CONTROL",
+                     1,
+                     paste0("outputs/", P(sim)$siteNames))
+  bbgc.ini <- iniSet(bbgc.ini, "OUTPUT_CONTROL", 2:6, c(
+    1, # 1 = write daily output   0 = no daily output
+    1, # 1 = monthly avg of daily variables  0 = no monthly avg
+    1, # 1 = annual avg of daily variables   0 = no annual avg
+    1, # 1 = write annual output  0 = no annual output
+    0, # 1 = write disturbance text output  0 = no disturbance output
+    1  # for on-screen progress indicator
+  )) 
+  
+  sim$bbgc.ini <- bbgc.ini
+  
   return(invisible(sim))
 }
 
