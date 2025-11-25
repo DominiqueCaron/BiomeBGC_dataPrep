@@ -295,7 +295,7 @@ prepareSpinupIni <- function(sim) {
   # Set OUTPUT_CONTROL section
   # TODO make sure this is what we want for the spinup
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1, 
-                           file.path("ouputs", P(sim)$siteNames, "_spinup"))
+                           file.path("outputs", paste0(P(sim)$siteNames, "_spinup")))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 2:6, 
                            c(0, # 1 = write daily output   0 = no daily output
                              0, # 1 = monthly avg of daily variables  0 = no monthly avg
@@ -305,20 +305,20 @@ prepareSpinupIni <- function(sim) {
   
   # Set DAILY_OUTPUT section
   # TODO Get the comments right
-  nDailyOuput <- length(P(sim)$dailyOutput)
+  nDailyOutput <- length(P(sim)$dailyOutput)
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                            "DAILY_OUTPUT",
-                           1:(nDailyOuput + 1),
-                           c(nDailyOuput, P(sim)$dailyOutput))
-  bbgcSpinup.ini$DAILY_OUTPUT <- bbgcSpinup.ini$DAILY_OUTPUT[c(1:(2+nDailyOuput)),]
+                           1:(nDailyOutput + 1),
+                           c(nDailyOutput, P(sim)$dailyOutput))
+  bbgcSpinup.ini$DAILY_OUTPUT <- bbgcSpinup.ini$DAILY_OUTPUT[c(1:(2+nDailyOutput)),]
   
   # Set ANNUAL_OUTPUT section
-  nAnnOuput <- length(P(sim)$annualOutput)
+  nAnnOutput <- length(P(sim)$annualOutput)
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                            "ANNUAL_OUTPUT",
-                           1:(nAnnOuput + 1),
-                           c(nAnnOuput, P(sim)$annualOutput))
-  bbgcSpinup.ini$ANNUAL_OUTPUT <- bbgcSpinup.ini$ANNUAL_OUTPUT[c(1:(2+nAnnOuput)),]
+                           1:(nAnnOutput + 1),
+                           c(nAnnOutput, P(sim)$annualOutput))
+  bbgcSpinup.ini$ANNUAL_OUTPUT <- bbgcSpinup.ini$ANNUAL_OUTPUT[c(1:(2+nAnnOutput)),]
   
   # add to simList
   sim$bbgcSpinup.ini <- bbgcSpinup.ini
