@@ -7,7 +7,7 @@ prepEPC <- function(dataSource, destinationPath, to = NULL){
                       cropTo = buffer(to, 30),
                       projectTo = crs(to))
     lcc <- extract(lcc, to)
-    functionalTypes <- lccToFuncType(lcc[,2])
+    functionalTypes <- lccToFuncType(lcc[, 2])
     epc <- lapply(functionalTypes, prepEPC, destinationPath)
     
   } else {
@@ -53,4 +53,19 @@ lccToFuncType <- function(lcc){
   funcType[lcc == 6] <- "enf"
   # Mixed forests?? set as evergreen needleleaf forest. TODO: is that ok??
   funcType[lcc == 7] <- "enf"
+}
+
+getSoilTextures(studyArea, destinationPath){
+  sand <- prepInputs(url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
+                    destinationPath= destinationPath,
+                    cropTo = buffer(studyArea, 100),
+                    projectTo = crs(studyArea))
+  sand <- extract(sand, to)
+  clay <- prepInputs(url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
+                     destinationPath= destinationPath,
+                     cropTo = buffer(studyArea, 100),
+                     projectTo = crs(studyArea))
+  clay <- extract(clay, to)
+  soilTexture <- round(c(sand = sand[, 2], silt = 100 - (sand[, 2] + clay[, 2]), clay = clay[, 2]))
+  return(soilTexture)
 }

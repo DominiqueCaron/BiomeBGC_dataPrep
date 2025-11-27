@@ -221,11 +221,11 @@ prepareSpinupIni <- function(sim) {
   # First read the ini template
   bbgcSpinup.ini <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
   
-  # Set MET_INPUT section
+  ## Set MET_INPUT section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
                            file.path("inputs", "metdata", basename(basename(P(sim)$metDataSource)))
   )
-  # Set RESTART section
+  ## Set RESTART section
   # TODO: make sure that the 
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
@@ -233,7 +233,7 @@ prepareSpinupIni <- function(sim) {
                            c(5, 6),
                            file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
   
-  # Set TIME_DEFINE section
+  ## Set TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, end(sim) - start(sim)) # number of simulation years
@@ -241,10 +241,10 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
   
-  # Set CLIM_CHANGE section
+  ## Set CLIM_CHANGE section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CLIM_CHANGE", c(1:5), P(sim)$climateChangeOptions)
   
-  # Set CO2_CONTROL section
+  ## Set CO2_CONTROL section
   # TODO: make sure that co2 is always constant for the spinup. If so, which year?
   # TODO: Get from external source
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
@@ -256,13 +256,43 @@ prepareSpinupIni <- function(sim) {
                              sim$CO2concentration[sim$CO2concentration$year == start(sim), "concentration"])
   }
   
-  # Set SITE section
-  # TODO: Get from an external source
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(1,5), P(sim)$siteConstants[c(1,5)])
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4), P(sim)$siteConstants[c(2:4)])
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
+  ## Set SITE section
+  # For each check if NA, if it is get the value from different sources
+  # Rooting zone soil depth, if NA set to 1m
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1, 
+                           ifelse(is.na(P(sim)$siteConstants[1]), 
+                                  1, 
+                                  P(sim)$siteConstants[1]))
+  # Soil texture: % of sand, % of silt, % of clay
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4),
+                           ifelse(is.na(P(sim)$siteConstants[2]),
+                                  getSoilText(sim$studyArea, destinationPath = dPath),
+                                  P(sim)$siteConstants[c(2:4)]
+                           ))
+  # Elevation
+  if(is.na(P(sim)$siteConstants[5]){
+    elevation <- get_elev_raster(locations = sf::st_as_sf(studyArea), z = 10)
+    elevation <- extract(rast(elevation), studyArea)[,2]
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, elevation)
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, P(sim)$siteConstants[5])
+  }
+  
+  # Latitude
+  if (is.na(P(sim)$siteConstants[6]) {
+    latitude <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2], 2)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, latitude)
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
+  }
+  # Site shortwave albedo
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(8:9), format(P(sim)$siteConstants[c(8:9)], scientific = FALSE, trim = TRUE))
+  
+  # wet+dry atmospheric deposition of N
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, format(P(sim)$siteConstants[8], scientific = FALSE, trim = TRUE))
+  
+  # symbiotic+asymbiotic fixation of N
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 9, format(P(sim)$siteConstants[9], scientific = FALSE, trim = TRUE))
   
   
   # Set RAMP_NDEP section
@@ -373,34 +403,22 @@ prepareIni <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-  dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  dPath <- asPath(inputPath(sim), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
   if (!suppliedElsewhere('studyArea', sim)) {
     stop("studyArea must be provided.")
   }
   
-  
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
     if(is.na(P(sim)$epcDataSource)){
       stop("Either ecophysiologicalConstants or the parameter epcDataSource needs to be provided.")
     } else {
-      dir.create(file.path(inputPath(sim), "epc"), showWarnings = FALSE)
-      if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
-        fileName <- file.path(
-          system.file("inputs", package = "BiomeBGCR"),
-          "epc",
-          paste0(P(sim)$epcDataSource, ".epc")
-        )
-      } else {
-        fileName <- P(sim)$epcDataSource
-      }
-      newFileName <- file.path(inputPath(sim), "epc", basename(fileName))
-      file.copy(fileName, 
-                newFileName,
-                overwrite = T
+      sim$ecophysiologicalConstants <- prepEPC(
+        dataSource = P(sim)$epcDataSource,
+        to = sim$studyArea,
+        destinationPath = dPath
       )
-      sim$ecophysiologicalConstants <- epcRead(newFileName)
     }
   } else if (!is.na(P(sim)$epcDataSource)) {
     message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
