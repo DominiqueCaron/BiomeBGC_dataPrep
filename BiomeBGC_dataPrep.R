@@ -19,7 +19,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
-  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/BiomeBGCR@development"),
+  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/BiomeBGCR@development", "elevatr"),
   parameters = bindrows(
     defineParameter("epcDataSource", "character", NA, NA, NA, 
                     paste("Three options:",
@@ -270,7 +270,7 @@ prepareSpinupIni <- function(sim) {
                                   P(sim)$siteConstants[c(2:4)]
                            ))
   # Elevation
-  if(is.na(P(sim)$siteConstants[5]){
+  if(is.na(P(sim)$siteConstants[5])){
     elevation <- get_elev_raster(locations = sf::st_as_sf(studyArea), z = 10)
     elevation <- extract(rast(elevation), studyArea)[,2]
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, elevation)
@@ -279,30 +279,59 @@ prepareSpinupIni <- function(sim) {
   }
   
   # Latitude
-  if (is.na(P(sim)$siteConstants[6]) {
+  if (is.na(P(sim)$siteConstants[6])) {
     latitude <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2], 2)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, latitude)
   } else {
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
   }
   # Site shortwave albedo
+  getAlbedo(sim$studyArea, year = start(sim), destinationPath = dPath)
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
   
   # wet+dry atmospheric deposition of N
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, format(P(sim)$siteConstants[8], scientific = FALSE, trim = TRUE))
+  if (is.na(P(sim)$siteConstants[8])) {
+    # Get data from https://www.nature.com/articles/s41467-024-55606-y
+    Ndeposition <- getNdeposition(sim$studyArea, year = start(sim), destinationPath = dPath)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, format(Ndeposition, scientific = FALSE, trim = TRUE))
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, P(sim)$siteConstants[8])
+  }
   
   # symbiotic+asymbiotic fixation of N
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 9, format(P(sim)$siteConstants[9], scientific = FALSE, trim = TRUE))
-  
+  if (is.na(P(sim)$siteConstants[9])) {
+    # Get from https://www.sciencebase.gov/catalog/item/66b53cabd34eebcf8bb3850a
+    NfixationRate <- getNfixationRate(sim$studyArea, destinationPath = dPath)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
+                             "SITE",
+                             9,
+                             format(NfixationRate, scientific = FALSE, trim = TRUE))
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 9, P(sim)$siteConstants[9])
+  }
   
   # Set RAMP_NDEP section
   # TODO: Make sure that it is always constant during spinup
-  # TODO: Get from external source
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
-                           c(0, #0 = constant deposition
-                             P(sim)$NDepositionLevel[2],
-                             format(P(sim)$NDepositionLevel[3], scientific = FALSE, trim = TRUE)
-                           ))
+  if(is.na(P(sim)$NDepositionLevel[2] == 1)){
+    if(P(sim)$NDepositionLevel[1] == 1){
+      refyear <- min(2020, end(sim))
+    } else {
+      refyear <- 2020
+    }
+    NDeposition2 <- getNdeposition(sim$studyArea, year = refyear, destinationPath = dPath)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
+                             c(0, #0 = constant deposition
+                               refyear,
+                               format(NDeposition2, scientific = FALSE, trim = TRUE)
+                             ))
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
+                             c(0, #0 = constant deposition
+                               P(sim)$NDepositionLevel[2],
+                               format(P(sim)$NDepositionLevel[3], scientific = FALSE, trim = TRUE)
+                             ))
+  }
+
   
   # Set EPC_FILE section
   if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){

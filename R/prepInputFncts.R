@@ -69,3 +69,45 @@ getSoilTextures(studyArea, destinationPath){
   soilTexture <- round(c(sand = sand[, 2], silt = 100 - (sand[, 2] + clay[, 2]), clay = clay[, 2]))
   return(soilTexture)
 }
+
+
+
+getNfixationRate <- function(studyArea, destinationPath){
+  # Get data from https://doi.org/10.5066/P13THKNR
+  # There is a high-res and low-res possibility
+  # Using low-res for now
+  NfixationRates <- prepInputs(
+    targetFile = "BNF_total_central_1.tif",
+    overwrite = TRUE,
+    url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
+    destinationPath = destinationPath,
+    cropTo = buffer(studyArea, 1000),
+    projectTo = crs(studyArea),
+    fun = "terra::rast"
+  )
+  NfixationRates <- extract(NfixationRates, studyArea)
+  NfixationRates <- NfixationRates[,2] / 10000 # convert from kg/ha/yr to kg/m2/yr
+  return(round(NfixationRates, 4))
+}
+
+getNdeposition <- function(studyArea, year, destinationPath){
+  # Get data from https://www.nature.com/articles/s41467-024-55606-y
+  # Available years: 2008 to 2020
+  Ndeposition <- prepInputs(
+    targetFile = paste0("mean_totN_", year, "_hm.tif"),
+    archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
+    overwrite = TRUE,
+    url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    destinationPath = destinationPath,
+    cropTo = buffer(studyArea, 1000),
+    projectTo = crs(studyArea),
+    fun = "terra::rast"
+  )
+  Ndeposition <- extract(Ndeposition, studyArea)
+  Ndeposition <- Ndeposition[,2] / 10000 # convert from kg/ha/yr to kg/m2/yr
+  return(round(Ndeposition, 4))
+}
+
+getAlbedo <- function(studyArea, year, destinationPath){
+
+}
