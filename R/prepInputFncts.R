@@ -33,6 +33,50 @@ prepEPC <- function(dataSource, destinationPath, to = NULL){
   return(epc)
 }
 
+
+prepSoilTexture <- function(destinationPath, studyArea){
+  sand <- prepInputs(url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
+                     destinationPath= destinationPath,
+                     cropTo = buffer(studyArea, 100),
+                     projectTo = crs(studyArea))
+  clay <- prepInputs(url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
+                     destinationPath= destinationPath,
+                     cropTo = buffer(studyArea, 100),
+                     projectTo = crs(studyArea))
+  silt <- 100 - (sand + clay)
+  soilTexture <- c(sand, silt, clay)
+  names(soilTexture) <- c("sand", "silt", "clay")
+  return(soilTexture)
+}
+
+prepNdeposition <- function(destinationPath, studyArea, year1, year2){
+  Ndeposition1 <- prepInputs(
+    targetFile = paste0("mean_totN_", year1, "_hm.tif"),
+    archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
+    overwrite = TRUE,
+    url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    destinationPath = destinationPath,
+    cropTo = buffer(studyArea, 1000),
+    projectTo = crs(studyArea),
+    fun = "terra::rast"
+  )
+  Ndeposition2 <- prepInputs(
+    targetFile = paste0("mean_totN_", year2, "_hm.tif"),
+    archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
+    overwrite = TRUE,
+    url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    destinationPath = destinationPath,
+    cropTo = buffer(studyArea, 1000),
+    projectTo = crs(studyArea),
+    fun = "terra::rast"
+  )
+  Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
+  names(Ndeposition) <- as.character(c(year1, year2))
+  return(Ndeposition)
+}
+
+prepNFixationRate <- function()
+
 # NFI land cover class values:
 # 1 = Bryoid
 # 2 = Herbs

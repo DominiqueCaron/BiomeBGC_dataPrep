@@ -435,8 +435,50 @@ prepareIni <- function(sim) {
   dPath <- asPath(inputPath(sim), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
   
+  # Study area needs to be either points or a polygon
   if (!suppliedElsewhere('studyArea', sim)) {
     stop("studyArea must be provided.")
+  }
+  
+  # Soil texture (% sand, % silt, % clay)
+  if (!suppliedElsewhere('soilTexture', sim)) {
+    sim$soilTexture <- prepSoilTexture(
+      destinationPath = dPath,
+      studyArea = sim$studyArea
+    ) |> Cache()
+  }
+  
+  # Elevation raster
+  if (!suppliedElsewhere('elevation', sim)) {
+    sim$elevation <-  get_elev_raster(
+      locations = sf::st_as_sf(sim$studyArea),
+      z = 10
+    ) |> Cache()
+  }
+  
+  # Total N deposition
+  if (!suppliedElsewhere('Ndeposition', sim)) {
+    year1 <- start(sim)
+    year2 <- min(end(sim), 2020)
+    sim$Ndeposition <-  prepNdeposition(
+      destinationPath = dPath,
+      studyArea = sim$studyArea,
+      year1 = year1,
+      year2 = year2
+    ) |> Cache()
+  }
+  
+  # Total N fixation rates
+  if (!suppliedElsewhere('NFixationRates', sim)) {
+    sim$NfixationRates <- prepInputs(
+      targetFile = "BNF_total_central_0.004.tif",
+      overwrite = TRUE,
+      url = "https://prod-is-usgs-sb-prod-content.s3.amazonaws.com/66b53cabd34eebcf8bb3850a/BNF_total_central_0.004.tif?AWSAccessKeyId=AKIAI7K4IX6D4QLARINA&Expires=1764444957&Signature=xDMkkRas0q%2BESPggQNVQ%2Fv0PuDQ%3D",
+      destinationPath = destinationPath,
+      cropTo = buffer(studyArea, 1000),
+      projectTo = crs(studyArea),
+      fun = "terra::rast"
+    ) |> Cache()
   }
   
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
