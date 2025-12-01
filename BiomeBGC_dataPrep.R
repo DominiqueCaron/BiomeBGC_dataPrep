@@ -489,10 +489,24 @@ prepareIni <- function(sim) {
         dataSource = P(sim)$epcDataSource,
         to = sim$studyArea,
         destinationPath = dPath
-      )
+      ) |> Cache()
     }
   } else if (!is.na(P(sim)$epcDataSource)) {
     message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
+  }
+  
+  if (!suppliedElsewhere('snowpackWaterContent', sim)) {
+    layerToKeep <- which(time(sim$snowpackWaterContent) == paste(start(sim), "01", "16", sep = "-"))
+    sim$snowpackWaterContent <- prepInputs(
+      targetFile = "SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
+      url = "https://climate-scenarios.canada.ca/files/SWE_SCF_obs/SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
+      fun = terra::rast(targetFile, lyrs = layerToKeep),
+      destinationPath = dPath,
+      cropTo = buffer(studyArea, 1000),
+      projectTo = crs(studyArea)
+      ) |> Cache()
+    sim$snowpackWaterContent <- sim$snowpackWaterContent * 1000 # We want mm (equivalent to kg/m2)
+    units(sim$snowpackWaterContent) <- "kg/m^2"
   }
   
   if (!suppliedElsewhere('meteorologicalData', sim)) {
