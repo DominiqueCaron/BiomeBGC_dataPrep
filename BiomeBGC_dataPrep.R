@@ -496,7 +496,7 @@ prepareIni <- function(sim) {
   
   # Total N deposition
   if (!suppliedElsewhere('Ndeposition', sim)) {
-    year1 <- start(sim)
+    year1 <- max(start(sim), 2008)
     year2 <- min(end(sim), 2020)
     sim$Ndeposition <-  prepNdeposition(
       destinationPath = dPath,
@@ -509,10 +509,10 @@ prepareIni <- function(sim) {
   # Total N fixation rates
   if (!suppliedElsewhere('NFixationRates', sim)) {
     sim$NfixationRates <- prepInputs(
-      targetFile = "BNF_total_central_0.004.tif",
+      targetFile = "BNF_total_central_1.tif",
       overwrite = TRUE,
-      url = "https://prod-is-usgs-sb-prod-content.s3.amazonaws.com/66b53cabd34eebcf8bb3850a/BNF_total_central_0.004.tif?AWSAccessKeyId=AKIAI7K4IX6D4QLARINA&Expires=1764444957&Signature=xDMkkRas0q%2BESPggQNVQ%2Fv0PuDQ%3D",
-      destinationPath = destinationPath,
+      url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
+      destinationPath = dPath,
       cropTo = buffer(studyArea, 1000),
       projectTo = crs(studyArea),
       fun = "terra::rast"
@@ -534,17 +534,18 @@ prepareIni <- function(sim) {
   }
   
   if (!suppliedElsewhere('snowpackWaterContent', sim)) {
-    layerToKeep <- which(time(sim$snowpackWaterContent) == paste(start(sim), "01", "16", sep = "-"))
     sim$snowpackWaterContent <- prepInputs(
       targetFile = "SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
       url = "https://climate-scenarios.canada.ca/files/SWE_SCF_obs/SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
-      fun = terra::rast(targetFile, lyrs = layerToKeep),
+      fun = "terra::rast",
       destinationPath = dPath,
       cropTo = buffer(studyArea, 1000),
       projectTo = crs(studyArea)
-      ) |> Cache()
-    sim$snowpackWaterContent <- sim$snowpackWaterContent * 1000 # We want mm (equivalent to kg/m2)
-    units(sim$snowpackWaterContent) <- "kg/m^2"
+    ) |> Cache()
+    yearToUse <- max(start(sim), 1981)
+    layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
+    sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]] * 1000 # We want mm (equivalent to kg/m2)
+    terra::units(sim$snowpackWaterContent) <- "kg/m^2"
   }
   
   if (!suppliedElsewhere('meteorologicalData', sim)) {
