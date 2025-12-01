@@ -64,7 +64,7 @@ defineModule(sim, list(
                           "multiplier for prcp, multiplier for vpd, and muliplier",
                           "for srad.")
     ),
-    defineParameter("siteConstants", "numeric", c(1, 30, 50, 20, 977, 46.8, 0.2, 0.0001, 0.0008), NA, NA, 
+    defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, 0.2, NA, NA), NA, NA, 
                     paste("A vector with site information:",
                           "1: effective soil depth",
                           "2: sand percentage",
@@ -74,12 +74,14 @@ defineModule(sim, list(
                           "6: site latitude in decimal degrees",
                           "7: site shortwave albedo",
                           "8: annual rate of atmospheric nitrogen deposition",
-                          "9: annual rate of symbiotic+asymbiotic nitrogen fixation")
+                          "9: annual rate of symbiotic+asymbiotic nitrogen fixation",
+                          "The non-na constants will be retrieved in various sources.")
     ),
-    defineParameter("waterState", "numeric", c(0, 0.5), NA, NA, 
+    defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA, 
                     paste("2-number vector for initial water conditions:",
                           "1: initial snowpack water content (kg/m2)",
-                          "2: intial soil water content as a proportion of saturation (DIM)")
+                          "2: intial soil water content as a proportion of saturation (DIM)",
+                          "If set to NA, the initial snowpack water content will be retrieved by an external source.")
     ),
     defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA, 
                     paste("11-number vector for initial carbon conditions:",
@@ -129,6 +131,42 @@ defineModule(sim, list(
                  desc = paste("Polygons to use as the study area. Must be supplied by the user.",
                               "One polygon per study site.")
     ),
+    expectsInput("soilTextures", "SpatRaster",
+      desc = paste(
+        "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
+        "The across-layers sum needs to equal to 1 for each pixels."
+      ),
+      sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
+    ), 
+    expectsInput("elevation", "SpatRaster",
+                 desc = paste(
+                   "An elevation (m) raster. By default, the raster will be extracted from",
+                   "AWS Terrain Tiles with the elevatr package."
+                 ),
+                 sourceURL = "https://registry.opendata.aws/terrain-tiles/"
+    ),
+    expectsInput("Ndeposition", "SpatRaster",
+                 desc = paste(
+                   "Raster(s) of total atmospheric N deposition (kgN/m2/yr).",
+                   "If N deposition is variable two layers need to be provided,", 
+                   "one for N deposition at the start, of the simulation and a",
+                   "second for N deposition at another timestep. The layer name", 
+                   "of the second raster needs to be the year of the data."
+                 ),
+                 sourceURL = "https://www.nature.com/articles/s41467-024-55606-y"
+    ), 
+    expectsInput("NFixationRates", "SpatRaster",
+                 desc = paste(
+                   "Raster of annual rate of symbiotic + asymbiotic nitrogen fixation (kgN/m2/yr)."
+                 ),
+                 sourceURL = "https://www.sciencebase.gov/catalog/item/66a97480d34e07a119db3a37"
+    ), 
+    expectsInput("snowpackWaterContent", "SpatRaster",
+                 desc = paste(
+                   "Initial snowpack water content (kg/m2)."
+                 ),
+                 sourceURL = "https://climate-scenarios.canada.ca/?page=blended-snow-data"
+    ), 
     expectsInput("ecophysiologicalConstants", "data.frame", 
                  desc = paste("Ecophysiological constants. The first column is the",
                               "description of the constants, the second column is",
