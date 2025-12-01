@@ -41,7 +41,7 @@ defineModule(sim, list(
                           "2) The path to a single file with annual variable CO2 concentration",
                           "3) The name of a data source to extract variable CO2 concentration (TBD).")
     ),
-    defineParameter("NDepositionLevel", "numeric", c(0, 2099, 0.0001), NA, NA, 
+    defineParameter("NDepositionLevel", "numeric", c(1, NA, NA), NA, NA, 
                     paste("A 3-number vector:",
                           "1) Keep nitrogen deposition level constant (0) or vary according to the time trajectory of CO2 mole fractions (1).",
                           "2) The reference year for N deposition (only used when N-deposition varies).",
@@ -132,11 +132,11 @@ defineModule(sim, list(
                               "One polygon per study site.")
     ),
     expectsInput("soilTextures", "SpatRaster",
-      desc = paste(
-        "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
-        "The across-layers sum needs to equal to 1 for each pixels."
-      ),
-      sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
+                 desc = paste(
+                   "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
+                   "The across-layers sum needs to equal to 1 for each pixels."
+                 ),
+                 sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
     ), 
     expectsInput("elevation", "SpatRaster",
                  desc = paste(
@@ -301,16 +301,22 @@ prepareSpinupIni <- function(sim) {
                            ifelse(is.na(P(sim)$siteConstants[1]), 
                                   1, 
                                   P(sim)$siteConstants[1]))
+  
   # Soil texture: % of sand, % of silt, % of clay
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4),
-                           ifelse(is.na(P(sim)$siteConstants[2]),
-                                  getSoilText(sim$studyArea, destinationPath = dPath),
-                                  P(sim)$siteConstants[c(2:4)]
-                           ))
+  if(is.na(P(sim)$siteConstants[2])){
+    soilTexture <- extract(sim$soilTexture, sim$studyArea) |> round(digits = 1)
+    # Make sure that sum == 100 after rounding.
+    soilTexture[, "silt"] <- 100 - (soilTexture[, "sand"] + soilTexture[, "clay"])
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4),
+                             soilTexture[,-1])
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4),
+                             P(sim)$siteConstants[c(2:4)])
+  }
+  
   # Elevation
   if(is.na(P(sim)$siteConstants[5])){
-    elevation <- get_elev_raster(locations = sf::st_as_sf(studyArea), z = 10)
-    elevation <- extract(rast(elevation), studyArea)[,2]
+    elevation <- extract(sim$elevation, sim$studyArea)[,2]
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, elevation)
   } else {
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, P(sim)$siteConstants[5])
@@ -323,14 +329,13 @@ prepareSpinupIni <- function(sim) {
   } else {
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
   }
+  
   # Site shortwave albedo
-  getAlbedo(sim$studyArea, year = start(sim), destinationPath = dPath)
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
   
   # wet+dry atmospheric deposition of N
   if (is.na(P(sim)$siteConstants[8])) {
-    # Get data from https://www.nature.com/articles/s41467-024-55606-y
-    Ndeposition <- getNdeposition(sim$studyArea, year = start(sim), destinationPath = dPath)
+    Ndeposition <- extract(sim$Ndeposition[[1]], sim$studyArea)[,2] |> round(digits = 4)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, format(Ndeposition, scientific = FALSE, trim = TRUE))
   } else {
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, P(sim)$siteConstants[8])
@@ -338,8 +343,7 @@ prepareSpinupIni <- function(sim) {
   
   # symbiotic+asymbiotic fixation of N
   if (is.na(P(sim)$siteConstants[9])) {
-    # Get from https://www.sciencebase.gov/catalog/item/66b53cabd34eebcf8bb3850a
-    NfixationRate <- getNfixationRate(sim$studyArea, destinationPath = dPath)
+    NfixationRate <- extract(sim$NfixationRates, sim$studyArea)[,2] |> round(digits = 4)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
                              "SITE",
                              9,
@@ -350,26 +354,15 @@ prepareSpinupIni <- function(sim) {
   
   # Set RAMP_NDEP section
   # TODO: Make sure that it is always constant during spinup
-  if(is.na(P(sim)$NDepositionLevel[2] == 1)){
-    if(P(sim)$NDepositionLevel[1] == 1){
-      refyear <- min(2020, end(sim))
-    } else {
-      refyear <- 2020
-    }
-    NDeposition2 <- getNdeposition(sim$studyArea, year = refyear, destinationPath = dPath)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
-                             c(0, #0 = constant deposition
-                               refyear,
-                               format(NDeposition2, scientific = FALSE, trim = TRUE)
-                             ))
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1:3, 
-                             c(0, #0 = constant deposition
-                               P(sim)$NDepositionLevel[2],
-                               format(P(sim)$NDepositionLevel[3], scientific = FALSE, trim = TRUE)
-                             ))
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1, 0)
+  if(P(sim)$NDeposition[1] == 1 & is.na(P(sim)$NDeposition[2])){
+    year2 <- names(sim$Ndeposition[[2]])
+    Ndeposition2 <- extract(sim$Ndeposition[[2]], sim$studyArea)[,2] |> round(digits = 4)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 2, year2)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 3, format(Ndeposition2, scientific = FALSE, trim = TRUE))
+  } else if (P(sim)$NDeposition[1] == 1 & !is.na(P(sim)$NDeposition[2])){
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", c(2,3), P(sim)$NDeposition[c(2,3)])
   }
-
   
   # Set EPC_FILE section
   if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
@@ -381,7 +374,13 @@ prepareSpinupIni <- function(sim) {
                            file.path("inputs", "epc", fileName))
   
   # Set W_STATE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1:2, P(sim)$waterState)
+  if(is.na(P(sim)$waterState[1])){
+    snowpackWaterContent <- extract(sim$snowpackWaterContent, sim$studyArea)[, 2] |> round(digits = 1)
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1, snowpackWaterContent)
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1, P(sim)$waterState[1])
+  }
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 2, P(sim)$waterState[2])
   
   # Set C_STATE section
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "C_STATE", 1:11, P(sim)$carbonState)
@@ -492,6 +491,7 @@ prepareIni <- function(sim) {
       locations = sf::st_as_sf(sim$studyArea),
       z = 10
     ) |> Cache()
+    sim$elevation <- rast(sim$elevation)
   }
   
   # Total N deposition
@@ -513,10 +513,11 @@ prepareIni <- function(sim) {
       overwrite = TRUE,
       url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
       destinationPath = dPath,
-      cropTo = buffer(studyArea, 1000),
-      projectTo = crs(studyArea),
+      cropTo = buffer(sim$studyArea, 1000),
+      projectTo = crs(sim$studyArea),
       fun = "terra::rast"
     ) |> Cache()
+    sim$NfixationRates <- sim$NfixationRates/10000 # convert from kg/ha/yr to kg/m2/yr
   }
   
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
@@ -539,8 +540,8 @@ prepareIni <- function(sim) {
       url = "https://climate-scenarios.canada.ca/files/SWE_SCF_obs/SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
       fun = "terra::rast",
       destinationPath = dPath,
-      cropTo = buffer(studyArea, 1000),
-      projectTo = crs(studyArea)
+      cropTo = buffer(sim$studyArea, 1000),
+      projectTo = crs(sim$studyArea)
     ) |> Cache()
     yearToUse <- max(start(sim), 1981)
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
