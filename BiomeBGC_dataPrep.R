@@ -19,7 +19,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
-  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/BiomeBGCR@development", "elevatr"),
+  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest"),
   parameters = bindrows(
     defineParameter("epcDataSource", "character", NA, NA, NA, 
                     paste("Three options:",
@@ -64,7 +64,7 @@ defineModule(sim, list(
                           "multiplier for prcp, multiplier for vpd, and muliplier",
                           "for srad.")
     ),
-    defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, 0.2, NA, NA), NA, NA, 
+    defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, NA, NA, NA), NA, NA, 
                     paste("A vector with site information:",
                           "1: effective soil depth",
                           "2: sand percentage",
@@ -131,6 +131,17 @@ defineModule(sim, list(
                  desc = paste("Polygons to use as the study area. Must be supplied by the user.",
                               "One polygon per study site.")
     ),
+    expectInput("sppEquiv", "data.frame",
+                desc = paste(
+                  "A data frame to link the leading species map to ecophysiological constants.",
+                  "The columns are speciesId, species, genus, functional plant type.")
+    ), 
+    expectInput("dominantSpecies", "SpatRaster",
+                desc = paste(
+                  "A raster with the leading tree species (speciesId).",
+                  "Use to determine the ecophysiological constants.",
+                  "By default, the NTEMS dominant tree species layer for the starting year is used."
+    ), 
     expectsInput("soilTextures", "SpatRaster",
                  desc = paste(
                    "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
@@ -168,11 +179,10 @@ defineModule(sim, list(
                  sourceURL = "https://climate-scenarios.canada.ca/?page=blended-snow-data"
     ), 
     expectsInput("ecophysiologicalConstants", "data.frame", 
-                 desc = paste("Ecophysiological constants. The first column is the",
-                              "description of the constants, the second column is",
-                              "the unit, and the following are the values of the constant.",
-                              "There are either a single column if all study sites share",
-                              "the same constant of one column per sites.")
+                 desc = paste(
+                   "Ecophysiological constants. Columns are species, genus, and",
+                   "the ecological constants (see template). By default,",
+                   "ecophysiologicalConstants are built from White et al., 2000.")
     ),
     expectsInput("meteorologicalData", "list", 
                  desc = paste("List of data.frames with the meteorological data",
@@ -324,14 +334,18 @@ prepareSpinupIni <- function(sim) {
   
   # Latitude
   if (is.na(P(sim)$siteConstants[6])) {
-    latitude <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2], 2)
+    latitude <- round(crds(project(sim$studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2], 2)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, latitude)
   } else {
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
   }
   
   # Site shortwave albedo
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
+  if (is.na(P(sim)$siteConstants[7])) {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, sim$shortwaveAlbedo)
+  } else {
+    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
+  }
   
   # wet+dry atmospheric deposition of N
   if (is.na(P(sim)$siteConstants[8])) {
@@ -477,6 +491,122 @@ prepareIni <- function(sim) {
     stop("studyArea must be provided.")
   }
   
+  # Dominant species layer
+  if (!suppliedElsewhere('dominantSpecies', sim)) {
+    sim$dominantSpecies <- LandR::prepInputs_NTEMS_DominantSpecies(
+      year = start(sim),
+      destinationPath = dPath,
+      cropTo = buffer(studyArea, 1000),
+      projectTo = crs(studyArea),
+    ) |> Cache()
+  }
+  
+  if (!suppliedElsewhere('sppEquiv', sim)) {
+    sppEquiv <- LandR::sppEquivalencies_CA[, c("LandR", "Latin_full", "Type")]
+    sppEquiv <- sppEquiv[sppEquiv$Latin_full != "",]
+    sppEquiv$genus <- sub(" .*", "", sppEquiv$Latin_full)
+    sppEquiv$PFT <- ifelse(sppEquiv$Type == "Conifer", "enf", "dbf")
+    sppEquiv <- data.frame(
+      speciesId = sppEquiv$LandR,
+      species = sppEquiv$Latin_full,
+      genus = sppEquiv$genus,
+      PFT = sppEquiv$PFT
+    )
+    sim$sppEquiv <- sppEquiv[sppEquiv$speciesId %in% names(sim$dominantSpecies),]
+  }
+  
+  if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
+    epc <- initiateEPC()
+    
+    ## append the enf and dbf plant functional types
+    epc <- rbindlist(list(epc, data.table(taxa = c("enf", "dbf"), level = "pft")), fill = TRUE)
+    enf <- epcRead("enf")
+    dbf <- epcRead("dbf")
+    epc[1, c(3:45)] <- data.table(matrix(enf$value, 1, 43))
+    epc[2, c(3:45)] <- data.table(matrix(dbf$value, 1, 43))
+    
+    ## Prepare parameters from White 2010
+    # Table 1
+    white2010_1 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet1.csv")
+    # a bit of cleaning, removing typos and lines we do not need.
+    white2010_1$Species[white2010_1$Species == "Prunus pennsylvanica"] <- "Prunus pensylvanica"
+    white2010_1$Species[white2010_1$Species == "Rubus alleghaniensis"] <- "Rubus allegheniensis"
+    white2010_1$Species[white2010_1$Species == "Rubus allighaniensis"] <- "Rubus allegheniensis"
+    white2010_1$Species[white2010_1$Species == "Betula Papyrifera"] <- "Betula papyrifera"
+    white2010_1$Species[white2010_1$Species == "Sequoiadendron gigant."] <- "Sequoiadendron giganteum"
+    white2010_1$Species[white2010_1$Species == "Tillia americana"] <- "Tilia americana"
+    white2010_1 <- white2010_1[!(white2010_1$Species %in% c("DBF", "ENF", "Lonicera x bella", "Mixed deciduous", "Mixed pine", "Nyssa-Acer", "Quercus prinus/rubra", "Rain forest", "Tropical deciduous forest", "Tsuga/Picea", "Wood", "Picea/Abies", "Cedar")), ]
+    white2010_1 <- prepEPCWhite2010(white2010_1, value.var = "Value")
+    names(white2010_1) <- c(
+      "taxa",
+      "CtoNDeadWood",
+      "CtoNFineRoots",
+      "newLiveWoodCToNewTotalWoodC",
+      "allToProjectLAI",
+      "CtoNLeaves",
+      "leafAndFineRootTurnover",
+      "canopyLightExtinction",
+      "CtoNLitter",
+      "newCoarseRootCToNewStemC",
+      "newFineRootCToNewLeafC",
+      "newStemCToNewLeafC",
+      "canopyAvgSLA",
+      "level"
+    )
+
+    # White 2010 table 2
+    white2010_2 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet2.csv")
+    # a bit of cleaning, removing typos and lines we do not need.
+    white2010_2$Species[white2010_2$Species == "Abies concolr"] <- "Abies concolor"
+    white2010_2$Species[white2010_2$Species == "Prunus pensylvannica"] <- "Prunus pensylvanica"
+    white2010_2$Species <- gsub("Abiea", "Abies",  white2010_2$Species)
+    white2010_2 <- white2010_2[!(white2010_2$Species == "ENF"), ]
+    white2010_2[white2010_2 == -999] <- NA
+    white2010_2[, c("Labile", "Cellulose", "Lignin")] <- white2010_2[, c("Labile", "Cellulose", "Lignin")]/100
+    white2010_2 <- prepEPCWhite2010(white2010_2, value.var = c("Labile", "Cellulose", "Lignin"))
+    names(white2010_2) <- c(
+      "taxa",
+      "fineRootLabileProportion",
+      "litterLabileProportion",
+      "fineRootCelluloseProportion",
+      "litterCelluloseProportion",
+      "fineRootLigininProportion",
+      "litterLigninProportion",
+      "level")
+    white2010 <- merge(white2010_1, white2010_2, by = c("taxa", "level"), all = TRUE)
+    
+    # White 2010 table 3
+    white2010_3 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet3.csv")
+    white2010_3$Species[white2010_3$Species == "Pinus elliotii"] <- "Pinus elliottii"
+    white2010_3$Species[white2010_3$Species == "Pinus Taeda"] <- "Pinus taeda"
+    white2010_3[white2010_3 == -999] <- NA
+    white2010_3[, c("Lignin", "Cellulose")] <- white2010_3[, c("Lignin", "Cellulose")]/100
+    white2010_3 <- prepEPCWhite2010(white2010_3, value.var = c("Lignin", "Cellulose"))
+    names(white2010_3) <- c(
+      "taxa",
+      "deadWoodLigninProportion",
+      "deadWoodCelluloseProportion",
+      "level")
+    white2010 <- merge(white2010, white2010_3, by = c("taxa", "level"), all = TRUE)
+    
+    # White 2010 table 4
+    white2010_4 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet4.csv")
+    white2010_4[white2010_4 == -999] <- NA
+    white2010_4 <- prepEPCWhite2010(white2010_4, value.var = c("Initial", "Final"))
+    names(white2010_4) <- c(
+      "taxa",
+      "initialLeafWaterPotential",
+      "finalLeafWaterPotential",
+      "level"
+    )
+    white2010 <- merge(white2010, white2010_4, by = c("taxa", "level"), all = TRUE)
+    
+    epc <- rbindlist(list(epc, white2010), fill = TRUE)
+    sim$ecophysiologicalConstants <- assertEPCproportions(epc)
+    
+  }
+  
+  
   # Soil texture (% sand, % silt, % clay)
   if (!suppliedElsewhere('soilTexture', sim)) {
     sim$soilTexture <- prepSoilTexture(
@@ -547,6 +677,16 @@ prepareIni <- function(sim) {
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
     sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]] * 1000 # We want mm (equivalent to kg/m2)
     terra::units(sim$snowpackWaterContent) <- "kg/m^2"
+  }
+  
+  if (!suppliedElsewhere('shortwaveAlbedo', sim)) {
+    lcc <- prepInputs(url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
+                      destinationPath= dPath,
+                      cropTo = buffer(sim$studyArea, 30),
+                      projectTo = crs(sim$studyArea)) |> Cache()
+    lcc <- extract(lcc, sim$studyArea)
+    albedoTable <- rvestAlbedoTable()
+    sim$shortwaveAlbedo <- lccToAlbedo(lcc[,2], albedoTable, sim$studyArea)
   }
   
   if (!suppliedElsewhere('meteorologicalData', sim)) {

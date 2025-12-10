@@ -181,3 +181,110 @@ CO2write <- function(co2Data, fileName){
               row.names = FALSE, 
               col.names = FALSE)
 }
+
+assertEPCproportions <- function(epc){
+  # check Litter proportions
+  ## If there is only one missing, fill by subtracting the sum of the other two to 1
+  epc[, litterProportionN :=
+        rowSums(!is.na(.SD)),
+      .SDcols = c("litterLabileProportion",
+                  "litterCelluloseProportion",
+                  "litterLigninProportion")]
+  epc[litterProportionN == 2 & is.na(litterLabileProportion), litterLabileProportion := 1 - (litterCelluloseProportion + litterLigninProportion)]
+  epc[litterProportionN == 2 & is.na(litterCelluloseProportion), litterCelluloseProportion := 1 - (litterLabileProportion + litterLigninProportion)]
+  epc[litterProportionN == 2 & is.na(litterLigninProportion), litterLigninProportion := 1 - (litterCelluloseProportion + litterLabileProportion)]
+  ## If the three are provided, make sure that they sum to 1 (scale if necessary)
+  epc[, litterProportionSum := litterLabileProportion + litterCelluloseProportion + litterLigninProportion]
+  epc[litterProportionN == 3 & litterProportionSum != 1, litterLabileProportion := litterLabileProportion / litterProportionSum]
+  epc[litterProportionN == 3 & litterCelluloseProportion != 1, litterCelluloseProportion := litterCelluloseProportion / litterProportionSum]
+  epc[litterProportionN == 3 & litterLigninProportion != 1, litterLigninProportion := litterLigninProportion / litterProportionSum]
+  epc[ , litterProportionN := NULL]
+  epc[ , litterProportionSum := NULL]
+  
+  # do the same with fine root proportions
+  ## If there is only one missing, fill by subtracting the sum of the other two to 1
+  epc[, FRProportionN :=
+        rowSums(!is.na(.SD)),
+      .SDcols = c("fineRootLabileProportion",
+                  "fineRootCelluloseProportion",
+                  "fineRootLigninProportion")]
+  epc[FRProportionN == 2 & is.na(fineRootLabileProportion), fineRootLabileProportion := 1 - (fineRootCelluloseProportion + fineRootLigninProportion)]
+  epc[FRProportionN == 2 & is.na(fineRootCelluloseProportion), fineRootCelluloseProportion := 1 - (fineRootLabileProportion + fineRootLigninProportion)]
+  epc[FRProportionN == 2 & is.na(fineRootLigninProportion), fineRootLigninProportion := 1 - (fineRootCelluloseProportion + fineRootLabileProportion)]
+  ## If the three are provided, make sure that they sum to 1 (scale if necessary)
+  epc[, FRProportionSum := fineRootLabileProportion + fineRootCelluloseProportion + fineRootLigninProportion]
+  epc[FRProportionN == 3 & FRProportionSum != 1, fineRootLabileProportion := fineRootLabileProportion / FRProportionSum]
+  epc[FRProportionN == 3 & FRProportionSum != 1, fineRootCelluloseProportion := fineRootCelluloseProportion / FRProportionSum]
+  epc[FRProportionN == 3 & FRProportionSum != 1, fineRootLigninProportion := fineRootLigninProportion / FRProportionSum]
+  epc[ , FRProportionN := NULL]
+  epc[ , FRProportionSum := NULL]
+ 
+  # and finally with dead wood
+  ## If there is only one missing, fill by subtracting the sum of the other two to 1
+  epc[, DWProportionN :=
+        rowSums(!is.na(.SD)),
+      .SDcols = c("deadWoodCelluloseProportion",
+                  "deadWoodLigninProportion")]
+  epc[DWProportionN == 1 & is.na(deadWoodCelluloseProportion), deadWoodCelluloseProportion := 1 - deadWoodLigninProportion]
+  epc[DWProportionN == 1 & is.na(deadWoodLigninProportion), deadWoodLigninProportion := 1 - deadWoodCelluloseProportion]
+  ## If the three are provided, make sure that they sum to 1 (scale if necessary)
+  epc[, DWProportionSum := deadWoodCelluloseProportion + deadWoodLigninProportion]
+  epc[DWProportionN == 2 & DWProportionSum != 1, deadWoodCelluloseProportion := deadWoodCelluloseProportion / DWProportionSum]
+  epc[DWProportionN == 2 & DWProportionSum != 1, deadWoodLigninProportion := deadWoodLigninProportion / DWProportionSum]
+  epc[ , DWProportionN := NULL]
+  epc[ , DWProportionSum := NULL]
+  
+  return(epc)
+}
+
+initiateEPC <- function() {
+  return(
+    data.frame(
+      taxa = character(),
+      level = factor(levels = c("species", "genus", "pft")),
+      woody = integer(),
+      evergreen = integer(),
+      c3psn = integer(),
+      modelPhenology = integer(),
+      yearDayToStartGrowth = integer(),
+      yearDayToEndLitterfall = integer(),
+      transferGrowthPeriod = numeric(),
+      litterfallPeriod = numeric(),
+      leafAndFineRootTurnover = numeric(),
+      annualLiveWoodTurnover = numeric(),
+      wholePlantMortality = numeric(),
+      fireMortality = numeric(),
+      newFineRootCToNewLeafC = numeric(),
+      newStemCToNewLeafC = numeric(),
+      newLiveWoodCToNewTotalWoodC = numeric(),
+      newCoarseRootCToNewStemC = numeric(),
+      currentGrowthProportion = numeric(),
+      CtoNLeaves = numeric(),
+      CtoNLitter = numeric(),
+      CtoNFineRoots = numeric(),
+      CtoNLiveWood = numeric(),
+      CtoNDeadWood = numeric(),
+      litterLabileProportion = numeric(),
+      litterCelluloseProportion = numeric(),
+      litterLigninProportion = numeric(),
+      fineRootLabileProportion = numeric(),
+      fineRootCelluloseProportion = numeric(),
+      fineRootLigninProportion = numeric(),
+      deadWoodCelluloseProportion = numeric(),
+      deadWoodLigninProportion = numeric(),
+      canopyWaterInterception = numeric(),
+      canopyLightExtinction = numeric(),
+      allToProjectLAI = numeric(),
+      canopyAvgSLA = numeric(),
+      shadedSLAToSunlightSLA = numeric(),
+      NfractionInRuBisCO = numeric(),
+      maxStomatalConductance = numeric(),
+      cuticularConductance = numeric(),
+      boundaryLayerConductance = numeric(),
+      initialLeafWaterPotential = numeric(),
+      finalLeafWaterPotential = numeric(),
+      initialVaportPressureDeficit = numeric(),
+      finalVaporPressureDeficit = numeric()
+    )
+  )
+}

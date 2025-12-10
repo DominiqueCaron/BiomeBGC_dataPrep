@@ -5,7 +5,7 @@ prepEPC <- function(dataSource, destinationPath, to = NULL){
     lcc <- prepInputs(url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
                       destinationPath= destinationPath,
                       cropTo = buffer(to, 30),
-                      projectTo = crs(to))
+                      projectTo = crs(to)) |> Cache()
     lcc <- extract(lcc, to)
     functionalTypes <- lccToFuncType(lcc[, 2])
     epc <- lapply(functionalTypes, prepEPC, destinationPath)
@@ -103,3 +103,73 @@ lccToFuncType <- function(lcc){
   funcType[lcc == 7] <- "enf"
 }
 
+# NFI land cover class values:
+# 1 = Bryoid
+# 2 = Herbs
+# 3 = Rock
+# 4 = Shrub
+# 5 = Tree cover is mainly “Treed broadleaf”
+# 6 = Tree cover is mainly “Treed conifer”
+# 7 = Tree cover is mainly “Treed mixed”
+# 8 = Water
+lccToAlbedo <- function(lcc, albedoTable, studyArea){
+  if (any(lcc %in% c(1,3,8))){
+    stop("One of the study site is bryoids, rock or water.")
+  }
+  latitude <- crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2]
+  if(latitude > 60){
+    colId <- 3
+  } else if (latitude > 50){
+    colId <- 4
+  } else if (latitude > 40){
+    colId <- 5
+  } else {
+    colId <- 6
+  }
+  albedo <- rep(0.2, length(lcc))
+  albedo[lcc == 2] <- albedoTable[7, colId]
+  albedo[lcc == 4] <- albedoTable[5, colId]
+  albedo[lcc == 5] <- albedoTable[3, colId]
+  albedo[lcc == 6] <- albedoTable[1, colId]
+  albedo[lcc == 7] <- albedoTable[4, colId]
+  return(round(albedo, digits = 2))
+}
+
+rvestAlbedoTable <- function(){
+  
+  # extract Table 1 of Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
+  GaoEtAl2005 <- read_html("http://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2004JD005190")
+  tables <- GaoEtAl2005 %>% html_table(fill = TRUE)
+  table1 <- tables[[1]]
+  
+  # Only keep the snow-free shortwave albedo entries
+  shortwaveAlbedo <- table1[c(26:34), c(2,3,5,7,9)]
+  
+  # Add column names
+  names(shortwaveAlbedo) <- c("IGBPclass", "lat6070", "lat5060", "lat4050", "lat3040")
+  
+  # Fix missing entries, set to NA
+  shortwaveAlbedo[shortwaveAlbedo=="â\u0080\u0093"] <- NA
+  
+  # Convert entries to numeric
+  shortwaveAlbedo[, c(2:5)] <- apply(shortwaveAlbedo[, c(2:5)], MARGIN = 2, as.numeric)
+  
+  return(as.data.frame(shortwaveAlbedo))
+}
+
+prepEPCWhite2010 <- function(tbl, value.var){
+  tbl <- tbl[tbl$Foliage.Nature %in% c("Evergreen needle leaf forest", "Deciduous broad leaf forest"),]
+  tbl$Species <- trimws(tbl$Species)
+  tbl$Species <- gsub(pattern = " spp.", "", tbl$Species)
+  tbl <- dcast(as.data.table(tbl), Species ~ Parameter, value.var = value.var, fun.aggregate = mean)
+  tbl[, Genus := sub(" .*", "", Species)]
+  tbl_sp <- tbl[Species != Genus, ]
+  tbl_sp[, Genus := NULL]
+  tbl_sp[, Level := "Species"]
+  tbl[, Species := NULL]
+  tbl_genus <- tbl[, lapply(.SD, mean, na.rm = TRUE), by = Genus]
+  tbl_genus[, Level := "Genus"]
+  setnames(tbl_genus, "Genus", "Species")
+  out <- rbindlist(list(tbl_sp, tbl_genus))
+  return(out)
+}
