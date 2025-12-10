@@ -140,7 +140,7 @@ defineModule(sim, list(
                 desc = paste(
                   "A raster with the leading tree species (speciesId).",
                   "Use to determine the ecophysiological constants.",
-                  "By default, the NTEMS dominant tree species layer for the starting year is used."
+                  "By default, the NTEMS dominant tree species layer for the starting year is used.")
     ), 
     expectsInput("soilTextures", "SpatRaster",
                  desc = paste(
@@ -516,93 +516,12 @@ prepareIni <- function(sim) {
   }
   
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
-    epc <- initiateEPC()
     
-    ## append the enf and dbf plant functional types
-    epc <- rbindlist(list(epc, data.table(taxa = c("enf", "dbf"), level = "pft")), fill = TRUE)
-    enf <- epcRead("enf")
-    dbf <- epcRead("dbf")
-    epc[1, c(3:45)] <- data.table(matrix(enf$value, 1, 43))
-    epc[2, c(3:45)] <- data.table(matrix(dbf$value, 1, 43))
-    
-    ## Prepare parameters from White 2010
-    # Table 1
-    white2010_1 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet1.csv")
-    # a bit of cleaning, removing typos and lines we do not need.
-    white2010_1$Species[white2010_1$Species == "Prunus pennsylvanica"] <- "Prunus pensylvanica"
-    white2010_1$Species[white2010_1$Species == "Rubus alleghaniensis"] <- "Rubus allegheniensis"
-    white2010_1$Species[white2010_1$Species == "Rubus allighaniensis"] <- "Rubus allegheniensis"
-    white2010_1$Species[white2010_1$Species == "Betula Papyrifera"] <- "Betula papyrifera"
-    white2010_1$Species[white2010_1$Species == "Sequoiadendron gigant."] <- "Sequoiadendron giganteum"
-    white2010_1$Species[white2010_1$Species == "Tillia americana"] <- "Tilia americana"
-    white2010_1 <- white2010_1[!(white2010_1$Species %in% c("DBF", "ENF", "Lonicera x bella", "Mixed deciduous", "Mixed pine", "Nyssa-Acer", "Quercus prinus/rubra", "Rain forest", "Tropical deciduous forest", "Tsuga/Picea", "Wood", "Picea/Abies", "Cedar")), ]
-    white2010_1 <- prepEPCWhite2010(white2010_1, value.var = "Value")
-    names(white2010_1) <- c(
-      "taxa",
-      "CtoNDeadWood",
-      "CtoNFineRoots",
-      "newLiveWoodCToNewTotalWoodC",
-      "allToProjectLAI",
-      "CtoNLeaves",
-      "leafAndFineRootTurnover",
-      "canopyLightExtinction",
-      "CtoNLitter",
-      "newCoarseRootCToNewStemC",
-      "newFineRootCToNewLeafC",
-      "newStemCToNewLeafC",
-      "canopyAvgSLA",
-      "level"
-    )
-
-    # White 2010 table 2
-    white2010_2 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet2.csv")
-    # a bit of cleaning, removing typos and lines we do not need.
-    white2010_2$Species[white2010_2$Species == "Abies concolr"] <- "Abies concolor"
-    white2010_2$Species[white2010_2$Species == "Prunus pensylvannica"] <- "Prunus pensylvanica"
-    white2010_2$Species <- gsub("Abiea", "Abies",  white2010_2$Species)
-    white2010_2 <- white2010_2[!(white2010_2$Species == "ENF"), ]
-    white2010_2[white2010_2 == -999] <- NA
-    white2010_2[, c("Labile", "Cellulose", "Lignin")] <- white2010_2[, c("Labile", "Cellulose", "Lignin")]/100
-    white2010_2 <- prepEPCWhite2010(white2010_2, value.var = c("Labile", "Cellulose", "Lignin"))
-    names(white2010_2) <- c(
-      "taxa",
-      "fineRootLabileProportion",
-      "litterLabileProportion",
-      "fineRootCelluloseProportion",
-      "litterCelluloseProportion",
-      "fineRootLigininProportion",
-      "litterLigninProportion",
-      "level")
-    white2010 <- merge(white2010_1, white2010_2, by = c("taxa", "level"), all = TRUE)
-    
-    # White 2010 table 3
-    white2010_3 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet3.csv")
-    white2010_3$Species[white2010_3$Species == "Pinus elliotii"] <- "Pinus elliottii"
-    white2010_3$Species[white2010_3$Species == "Pinus Taeda"] <- "Pinus taeda"
-    white2010_3[white2010_3 == -999] <- NA
-    white2010_3[, c("Lignin", "Cellulose")] <- white2010_3[, c("Lignin", "Cellulose")]/100
-    white2010_3 <- prepEPCWhite2010(white2010_3, value.var = c("Lignin", "Cellulose"))
-    names(white2010_3) <- c(
-      "taxa",
-      "deadWoodLigninProportion",
-      "deadWoodCelluloseProportion",
-      "level")
-    white2010 <- merge(white2010, white2010_3, by = c("taxa", "level"), all = TRUE)
-    
-    # White 2010 table 4
-    white2010_4 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet4.csv")
-    white2010_4[white2010_4 == -999] <- NA
-    white2010_4 <- prepEPCWhite2010(white2010_4, value.var = c("Initial", "Final"))
-    names(white2010_4) <- c(
-      "taxa",
-      "initialLeafWaterPotential",
-      "finalLeafWaterPotential",
-      "level"
-    )
-    white2010 <- merge(white2010, white2010_4, by = c("taxa", "level"), all = TRUE)
-    
-    epc <- rbindlist(list(epc, white2010), fill = TRUE)
-    sim$ecophysiologicalConstants <- assertEPCproportions(epc)
+    sim$ <- prepWhite2010EPC(
+      url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link",
+      sppEquiv = sim$sppEquiv,
+      destinationPath = dPath
+    ) 
     
   }
   
