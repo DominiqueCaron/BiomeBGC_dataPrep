@@ -620,10 +620,10 @@ prepareIni <- function(sim) {
   
   if (!suppliedElsewhere('CO2concentration', sim)) {
     
-    sim$CO2concentration <- prepCO2concentration(
+    sim$CO2concentration <- prepCo2Concentration(
       firstYear = start(sim),
       lastYear = end(sim),
-      co2scenario = P(sim)$co2scenario,
+      scenario = P(sim)$co2scenario,
       destinationPath= dPath
     )
     

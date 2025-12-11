@@ -157,7 +157,7 @@ rvestAlbedoTable <- function(){
   return(as.data.frame(shortwaveAlbedo))
 }
 
-prepCo2concentration <- function(firstYear, secondYear, scenario, destinationPath){
+prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath){
   dir.create(file.path(destinationPath, "co2"), showWarnings = FALSE)
   if(firstYear <= 2014){
     historialConcentrations <- prepInputs(
