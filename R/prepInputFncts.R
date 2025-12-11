@@ -189,7 +189,8 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   white2010_1 <- prepInputs(targetFile = "White_spreadsheet1.csv", 
                             url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
                             destinationPath = destinationPath,
-                            fun = "data.table::fread")
+                            fun = "data.table::fread",
+                            check.names = TRUE)
   # A bit of cleaning, removing typos and lines we do not need.
   white2010_1$Species[white2010_1$Species == "Prunus pennsylvanica"] <- "Prunus pensylvanica"
   white2010_1$Species[white2010_1$Species == "Rubus alleghaniensis"] <- "Rubus allegheniensis"
@@ -220,7 +221,8 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   white2010_2 <- prepInputs(targetFile = "White_spreadsheet2.csv", 
                             url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
                             destinationPath = destinationPath,
-                            fun = "data.table::fread")
+                            fun = "data.table::fread",
+                            check.names = TRUE)
   # a bit of cleaning, removing typos and lines we do not need.
   white2010_2$Species[white2010_2$Species == "Abies concolr"] <- "Abies concolor"
   white2010_2$Species[white2010_2$Species == "Prunus pensylvannica"] <- "Prunus pensylvanica"
@@ -235,13 +237,17 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
     "litterLabileProportion",
     "fineRootCelluloseProportion",
     "litterCelluloseProportion",
-    "fineRootLigininProportion",
+    "fineRootLigninProportion",
     "litterLigninProportion",
     "level")
   white2010 <- merge(white2010_1, white2010_2, by = c("taxa", "level"), all = TRUE)
   
   # White 2010 table 3
-  white2010_3 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet3.csv")
+  white2010_3 <- prepInputs(targetFile = "White_spreadsheet3.csv", 
+                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
+                            destinationPath = destinationPath,
+                            fun = "data.table::fread",
+                            check.names = TRUE)
   white2010_3$Species[white2010_3$Species == "Pinus elliotii"] <- "Pinus elliottii"
   white2010_3$Species[white2010_3$Species == "Pinus Taeda"] <- "Pinus taeda"
   white2010_3[white2010_3 == -999] <- NA
@@ -255,7 +261,11 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   white2010 <- merge(white2010, white2010_3, by = c("taxa", "level"), all = TRUE)
   
   # White 2010 table 4
-  white2010_4 <- read.csv("~/../Downloads/white_model_parameters_652/white_model_parameters_652/data/White_spreadsheet4.csv")
+  white2010_4 <- prepInputs(targetFile = "White_spreadsheet4.csv", 
+                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
+                            destinationPath = destinationPath,
+                            fun = "data.table::fread",
+                            check.names = TRUE)
   white2010_4[white2010_4 == -999] <- NA
   white2010_4 <- prepWhite2010Table(white2010_4, value.var = c("Initial", "Final"))
   names(white2010_4) <- c(
@@ -273,14 +283,32 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
 }
 
 getEPC <- function(epcTable, sppEquiv){
-  browser()
-  res <- speciesTrait[spList, on = "species"]
+  epcSpecies <- epcTable[level == "Species"]
+  epcGenus <- epcTable[level == "Genus", ]
+  epcPFT <- epcTable[level == "pft", ]
+  epc_cols <- colnames(epcTable[,-c(1,2)])
+  res <- as.data.table(sppEquiv)
+  
+  # 1. Species-level traits
+  res <- merge(res, epcSpecies, by.x = "species", by.y = "taxa", all.x = TRUE)
   
   # 2. Genus-level (adds trait.genus)
-  res <- genusTrait[res, on = "genus", nomatch = 0,
-                    trait.genus := i.trait][, trait := NULL]
+  res <- merge(res, epcGenus, by.x = "genus", by.y = "taxa", all.x = TRUE, suffixes = c("", "_genus"))
   
   # 3. PFT-level (adds trait.pft)
-  res <- pftTrait[res, on = "pft", nomatch = 0,
-                  trait.pft := i.trait][, trait := NULL]
+  res <- merge(res, epcPFT, by.x = "PFT", by.y = "taxa", all.x = TRUE, suffixes = c("", "_pft"))
+  
+  for (col in epc_cols) {
+    res[, (col) := fifelse(!is.na(get(col)), 
+                           get(col), 
+                           fifelse(!is.na(get(paste0(col, "_genus"))),
+                                   get(paste0(col, "_genus")),
+                                   get(paste0(col, "_pft"))
+                           )
+    )
+    ]
+  }
+  cols <- c("speciesId", "species", epc_cols)
+  res <- res[ , ..cols]
+  return(res)
 }

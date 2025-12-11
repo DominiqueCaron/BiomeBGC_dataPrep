@@ -19,7 +19,8 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
-  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest"),
+  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", 
+                  "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table"),
   parameters = bindrows(
     defineParameter("epcDataSource", "character", NA, NA, NA, 
                     paste("Three options:",
@@ -131,12 +132,12 @@ defineModule(sim, list(
                  desc = paste("Polygons to use as the study area. Must be supplied by the user.",
                               "One polygon per study site.")
     ),
-    expectInput("sppEquiv", "data.frame",
+    expectsInput("sppEquiv", "data.frame",
                 desc = paste(
                   "A data frame to link the leading species map to ecophysiological constants.",
                   "The columns are speciesId, species, genus, functional plant type.")
     ), 
-    expectInput("dominantSpecies", "SpatRaster",
+    expectsInput("dominantSpecies", "SpatRaster",
                 desc = paste(
                   "A raster with the leading tree species (speciesId).",
                   "Use to determine the ecophysiological constants.",
@@ -496,8 +497,8 @@ prepareIni <- function(sim) {
     sim$dominantSpecies <- LandR::prepInputs_NTEMS_DominantSpecies(
       year = start(sim),
       destinationPath = dPath,
-      cropTo = buffer(studyArea, 1000),
-      projectTo = crs(studyArea),
+      cropTo = buffer(sim$studyArea, 1000),
+      projectTo = crs(sim$studyArea),
     ) |> Cache()
   }
   
@@ -517,7 +518,7 @@ prepareIni <- function(sim) {
   
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
     
-    sim$ <- prepWhite2010EPC(
+    sim$ecophysiologicalConstants <- prepWhite2010EPC(
       url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link",
       sppEquiv = sim$sppEquiv,
       destinationPath = dPath
@@ -569,19 +570,19 @@ prepareIni <- function(sim) {
     sim$NfixationRates <- sim$NfixationRates/10000 # convert from kg/ha/yr to kg/m2/yr
   }
   
-  if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
-    if(is.na(P(sim)$epcDataSource)){
-      stop("Either ecophysiologicalConstants or the parameter epcDataSource needs to be provided.")
-    } else {
-      sim$ecophysiologicalConstants <- prepEPC(
-        dataSource = P(sim)$epcDataSource,
-        to = sim$studyArea,
-        destinationPath = dPath
-      ) |> Cache()
-    }
-  } else if (!is.na(P(sim)$epcDataSource)) {
-    message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
-  }
+  # if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
+  #   if(is.na(P(sim)$epcDataSource)){
+  #     stop("Either ecophysiologicalConstants or the parameter epcDataSource needs to be provided.")
+  #   } else {
+  #     sim$ecophysiologicalConstants <- prepEPC(
+  #       dataSource = P(sim)$epcDataSource,
+  #       to = sim$studyArea,
+  #       destinationPath = dPath
+  #     ) |> Cache()
+  #   }
+  # } else if (!is.na(P(sim)$epcDataSource)) {
+  #   message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
+  # }
   
   if (!suppliedElsewhere('snowpackWaterContent', sim)) {
     sim$snowpackWaterContent <- prepInputs(
