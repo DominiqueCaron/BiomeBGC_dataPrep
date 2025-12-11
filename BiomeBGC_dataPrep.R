@@ -619,21 +619,14 @@ prepareIni <- function(sim) {
   }
   
   if (!suppliedElsewhere('CO2concentration', sim)) {
-    if(is.na(P(sim)$CO2DataSource)){
-      stop("Either CO2concentration or the parameter CO2DataSource needs to be provided.")
-    } else if (is.numeric(P(sim)$CO2DataSource)){
-      sim$CO2concentration <- P(sim)$CO2DataSource
-    } else {
-      dir.create(file.path(inputPath(sim), "co2"), showWarnings = FALSE)
-      newFileName <- file.path(inputPath(sim), "co2", basename(P(sim)$CO2DataSource))
-      file.copy(P(sim)$CO2DataSource, 
-                newFileName,
-                overwrite = T
-      )
-      sim$CO2concentration <- CO2Read(newFileName)
-    }
-  } else if (!is.na(P(sim)$CO2DataSource)) {
-    message("Using provided CO2 concentration data, ignoring parameter CO2DataSource.")
+    
+    sim$CO2concentration <- prepCO2concentration(
+      firstYear = start(sim),
+      lastYear = end(sim),
+      co2scenario = P(sim)$co2scenario,
+      destinationPath= dPath
+    )
+    
   }
   
   # ! ----- STOP EDITING ----- ! #

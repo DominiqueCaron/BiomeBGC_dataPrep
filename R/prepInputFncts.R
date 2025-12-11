@@ -157,6 +157,43 @@ rvestAlbedoTable <- function(){
   return(as.data.frame(shortwaveAlbedo))
 }
 
+prepCo2concentration <- function(firstYear, secondYear, scenario, destinationPath){
+  dir.create(file.path(destinationPath, "co2"), showWarnings = FALSE)
+  if(firstYear <= 2014){
+    historialConcentrations <- prepInputs(
+      targetFile = "co2_historical_annual_1850_2014.txt",
+      url = "https://files.isimip.org/ISIMIP3b/InputData/climate/atmosphere_composition/co2/historical/co2_historical_annual_1850_2014.txt",
+      destinationPath = destinationPath,
+      fun = "read.table"
+    )
+  } else {
+    historialConcentrations <- c()
+  }
+  if(lastYear > 2014){
+    if (!(scenario %in% c("ssp126", "ssp370", "ssp585"))){
+      stop("The co2 concentration scenarios available are ssp126, ssp370, or ssp585")
+    }
+    targetFile <- paste0("co2_", scenario, "_annual_2015_2100.txt")
+    url <- paste("https://files.isimip.org/ISIMIP3b/InputData/climate/atmosphere_composition/co2",
+                 scenario, targetFile, sep = "/")
+    predictedConcentrations <- prepInputs(
+      targetFile = targetFile,
+      url = url,
+      destinationPath = destinationPath,
+      fun = "read.table"
+    )
+  } else {
+    predictedConcentrations <- c()
+  }
+  co2concentrations <- rbind(historialConcentrations, predictedConcentrations)
+  yearToKeep <- firstYear <= co2concentrations[,1] & co2concentrations[,1] <= lastYear
+  co2concentrations <- co2concentrations[yearToKeep, ]
+  fileName <- paste("co2", firstYear, lastYear, paste0(scenario, ".txt"), sep = "_")
+  write.table(co2concentrations, file = file.path(destinationPath, "co2", fileName))
+  names(co2concentrations) <- c("year", "co2_ppm")
+  return(co2concentrations)
+}
+
 prepWhite2010Table <- function(tbl, value.var){
   tbl <- tbl[tbl$Foliage.Nature %in% c("Evergreen needle leaf forest", "Deciduous broad leaf forest"),]
   tbl$Species <- trimws(tbl$Species)
