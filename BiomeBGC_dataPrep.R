@@ -513,7 +513,8 @@ prepareIni <- function(sim) {
       genus = sppEquiv$genus,
       PFT = sppEquiv$PFT
     )
-    sim$sppEquiv <- sppEquiv[sppEquiv$speciesId %in% names(sim$dominantSpecies),]
+    sppEquiv <- sppEquiv[sppEquiv$speciesId %in% names(sim$dominantSpecies),]
+    sim$sppEquiv <- sppEquiv[!duplicated(sppEquiv$speciesId),]
   }
   
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {

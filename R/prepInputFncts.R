@@ -175,6 +175,7 @@ prepWhite2010Table <- function(tbl, value.var){
 }
 
 prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
+  dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
   epc <- initiateEPC()
   
   ## append the enf and dbf plant functional types
@@ -279,6 +280,7 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   epc <- rbindlist(list(epc, white2010), fill = TRUE)
   epc <- assertEPCproportions(epc)
   epc <- getEPC(epc, sppEquiv)
+  apply(epc, MARGIN = 1, epcWrite2)
   return(epc)
 }
 

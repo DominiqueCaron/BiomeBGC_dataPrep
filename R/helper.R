@@ -72,6 +72,19 @@ epcParseLine <- function(epcLine){
   return(c(epcDescription, epcUnit, epcValue))
 }
 
+epcWrite2 <- function(epc, fileName){
+  # Get a template
+  epcTemplate <- file.path(
+    system.file("inputs", package = "BiomeBGCR"),
+    "epc", "enf.epc")
+  
+  epcOut <- epcRead(fileName = epcTemplate)
+  attr(epcOut, "description") <- paste0(epc[, "species"], "-dominated stands")
+  epcOut[, "value"] <- as.numeric(epc[,-c(1,2)])
+  epcWrite(epcOut, fileName = fileName)
+}
+
+
 epcWrite <- function(epc, fileName){
   # Create and enter file
   sink(fileName)
