@@ -380,11 +380,13 @@ prepareSpinupIni <- function(sim) {
   }
   
   # Set EPC_FILE section
-  if(P(sim)$epcDataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
-    fileName <- paste0(P(sim)$epcDataSource, ".epc")
-  } else {
-    fileName <- basename(P(sim)$epcDataSource)
-  }
+  # extract the correct dominant species
+  dominantSpecies <- extract(sim$dominantSpecies, sim$studyArea)[-1]
+  dominantSpecies <- unique(names(dominantSpecies)[dominantSpecies==1])
+  dominantSpecies <- sim$sppEquiv$species[sim$sppEquiv$speciesId == dominantSpecies]
+  # set filename
+  fileName <- tolower(paste0(gsub(" ", "", dominantSpecies), ".epc"))
+  # set in ini file
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1, 
                            file.path("inputs", "epc", fileName))
   
@@ -571,20 +573,6 @@ prepareIni <- function(sim) {
     sim$NfixationRates <- sim$NfixationRates/10000 # convert from kg/ha/yr to kg/m2/yr
   }
   
-  # if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
-  #   if(is.na(P(sim)$epcDataSource)){
-  #     stop("Either ecophysiologicalConstants or the parameter epcDataSource needs to be provided.")
-  #   } else {
-  #     sim$ecophysiologicalConstants <- prepEPC(
-  #       dataSource = P(sim)$epcDataSource,
-  #       to = sim$studyArea,
-  #       destinationPath = dPath
-  #     ) |> Cache()
-  #   }
-  # } else if (!is.na(P(sim)$epcDataSource)) {
-  #   message("Using provided ecophysiological constants, ignoring parameter epcDataSource.")
-  # }
-  
   if (!suppliedElsewhere('snowpackWaterContent', sim)) {
     sim$snowpackWaterContent <- prepInputs(
       targetFile = "SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
@@ -594,7 +582,11 @@ prepareIni <- function(sim) {
       cropTo = buffer(sim$studyArea, 1000),
       projectTo = crs(sim$studyArea)
     ) |> Cache()
-    yearToUse <- max(start(sim), 1981)
+    yearToUse <- min(max(start(sim), 1981), 2016)
+    if(yearToUse != start(sim)){
+      message("Snowpack water content data is not available for year ",
+              start(sim), ", using data of year ", yearToUse)
+    }
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
     sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]] * 1000 # We want mm (equivalent to kg/m2)
     terra::units(sim$snowpackWaterContent) <- "kg/m^2"

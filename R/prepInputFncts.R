@@ -280,7 +280,7 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   epc <- rbindlist(list(epc, white2010), fill = TRUE)
   epc <- assertEPCproportions(epc)
   epc <- getEPC(epc, sppEquiv)
-  apply(epc, MARGIN = 1, epcWrite2)
+  apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   return(epc)
 }
 
