@@ -159,33 +159,21 @@ rvestAlbedoTable <- function(){
 
 prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath){
   dir.create(file.path(destinationPath, "co2"), showWarnings = FALSE)
-  if(firstYear <= 2014){
-    historialConcentrations <- prepInputs(
-      targetFile = "co2_historical_annual_1850_2014.txt",
-      url = "https://files.isimip.org/ISIMIP3b/InputData/climate/atmosphere_composition/co2/historical/co2_historical_annual_1850_2014.txt",
-      destinationPath = destinationPath,
-      fun = "read.table"
+  if (!(scenario %in% c("RCP26", "RCP45", "RCP60", "RCP85"))) {
+    stop(
+      "Available representative concentration pathways for co2 concentration ",
+      "are RCP26, RCP45, RCP60, or RCP85"
     )
-  } else {
-    historialConcentrations <- c()
   }
-  if(lastYear > 2014){
-    if (!(scenario %in% c("ssp126", "ssp370", "ssp585"))){
-      stop("The co2 concentration scenarios available are ssp126, ssp370, or ssp585")
-    }
-    targetFile <- paste0("co2_", scenario, "_annual_2015_2100.txt")
-    url <- paste("https://files.isimip.org/ISIMIP3b/InputData/climate/atmosphere_composition/co2",
-                 scenario, targetFile, sep = "/")
-    predictedConcentrations <- prepInputs(
-      targetFile = targetFile,
-      url = url,
-      destinationPath = destinationPath,
-      fun = "read.table"
-    )
-  } else {
-    predictedConcentrations <- c()
-  }
-  co2concentrations <- rbind(historialConcentrations, predictedConcentrations)
+  targetFile <- paste0(scenario, "_MIDYR_CONC.DAT")
+  url <- paste0(
+    "https://raw.githubusercontent.com/ClimateChangeEcon/Climate_in_Climate_Economics/refs/heads/main/calibration_data/EmiAndConcData/",
+    targetFile
+  )
+  co2concentration <- prepInputs(targetFile = targetFile,
+                                 url = url,
+                                 fun = readCO2,
+                                 destinationPath = destinationPath)
   yearToKeep <- firstYear <= co2concentrations[,1] & co2concentrations[,1] <= lastYear
   co2concentrations <- co2concentrations[yearToKeep, ]
   fileName <- paste("co2", firstYear, lastYear, paste0(scenario, ".txt"), sep = "_")
@@ -319,6 +307,23 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   epc <- getEPC(epc, sppEquiv)
   apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   return(epc)
+}
+
+prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, climModel){
+  # get latitude and longitude
+  latlon <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84")), 2)
+  lon <- latlon[1]
+  lat <- latlon[2]
+  
+  # get climate
+  climate <- generateWeather(c("Climatic_Daily", "VaporPressureDeficit_Daily"), firstYear, lastYear, siteName, lat, lon, rcp = scenario, climModel = climModel, additionalParms = NULL)
+  
+  # fix leap years and organize columns
+  
+  # get day length
+  daylen <- daylength(lat, 1:365)
+
+    
 }
 
 getEPC <- function(epcTable, sppEquiv){

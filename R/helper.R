@@ -90,6 +90,11 @@ epcWrite2 <- function(epc, destinationPath){
   epcWrite(epcOut, fileName = fileName)
 }
 
+readCO2 <- function(file){
+  co2Data <- read.table(file, skip = 39)
+  co2Data <- co2Data[ ,c(1,4)]
+  return(co2Data)
+}
 
 epcWrite <- function(epc, fileName){
   # Create and enter file

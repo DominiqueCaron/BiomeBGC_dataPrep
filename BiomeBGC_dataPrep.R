@@ -20,7 +20,8 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
   reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", 
-                  "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table"),
+                  "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
+                  "RNCan/BioSimClient_R"),
   parameters = bindrows(
     defineParameter("epcDataSource", "character", NA, NA, NA, 
                     paste("Three options:",
