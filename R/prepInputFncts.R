@@ -170,10 +170,16 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
     "https://raw.githubusercontent.com/ClimateChangeEcon/Climate_in_Climate_Economics/refs/heads/main/calibration_data/EmiAndConcData/",
     targetFile
   )
-  co2concentrations <- prepInputs(targetFile = targetFile,
-                                 url = url,
-                                 fun = readCO2,
-                                 destinationPath = destinationPath)
+  co2concentrations <- prepInputs(
+    targetFile = targetFile,
+    url = url,
+    fun = {
+      co2Data <- read.table(targetFile, skip = 39)
+      co2Data <- co2Data[, c(1, 4)]
+      co2Data
+    },
+    destinationPath = destinationPath
+  ) |> Cache()
   yearToKeep <- firstYear <= co2concentrations[,1] & co2concentrations[,1] <= lastYear
   co2concentrations <- co2concentrations[yearToKeep, ]
   fileName <- paste("co2", firstYear, lastYear, paste0(scenario, ".txt"), sep = "_")
