@@ -170,7 +170,7 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
     "https://raw.githubusercontent.com/ClimateChangeEcon/Climate_in_Climate_Economics/refs/heads/main/calibration_data/EmiAndConcData/",
     targetFile
   )
-  co2concentration <- prepInputs(targetFile = targetFile,
+  co2concentrations <- prepInputs(targetFile = targetFile,
                                  url = url,
                                  fun = readCO2,
                                  destinationPath = destinationPath)
@@ -353,6 +353,7 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
     lastYear,
     ".mtc43"
   ))
+  fileName <- file.path(destinationPath, "metdata", fileName)
   
   metWrite(
     metData = climate,
