@@ -309,7 +309,7 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   return(epc)
 }
 
-prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, climModel){
+prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, climModel, destinationPath){
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude

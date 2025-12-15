@@ -21,72 +21,11 @@ defineModule(sim, list(
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
   reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", 
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
-                  "RNCan/BioSimClient_R", "geosphere"),
+                  "RNCan/BioSimClient_R", "geosphere", "BioSIM"),
   parameters = bindrows(
-    defineParameter("epcDataSource", "character", NA, NA, NA, 
-                    paste("Three options:",
-                          "1) The path(s) to the ecophysiological constants file(s).",
-                          "There can be a single file, or one per study site.",
-                          "2) One of the Biome-BGC default epc files (e.g., \"enf\")",
-                          "A single default can be used or one per study site.",
-                          "3) The source from which ecophysiological constants are extracted (TBD).")
-    ),
-    defineParameter("climModel", "character", NA, NA, NA, 
-                    paste("")
-    ),
-    defineParameter("metDataSource", "character", NA, NA, NA, 
-                    paste("Two options:",
-                          "1) The path(s) to the meteorological file(s).",
-                          "There can be a single file, or one per study site.",
-                          "2) Source of the meteorological data. PRISM? daymet? CHELSA (TBD)?")
-    ),
-    defineParameter("CO2DataSource", "numeric|character", NA, NA, NA, 
-                    paste("Three options:",
-                          "1) A numeric to set a constant atmospheric CO2 concentraion (in ppm),",
-                          "2) The path to a single file with annual variable CO2 concentration",
-                          "3) The name of a data source to extract variable CO2 concentration (TBD).")
-    ),
-    defineParameter("NDepositionLevel", "numeric", c(1, NA, NA), NA, NA, 
-                    paste("A 3-number vector:",
-                          "1) Keep nitrogen deposition level constant (0) or vary according to the time trajectory of CO2 mole fractions (1).",
-                          "2) The reference year for N deposition (only used when N-deposition varies).",
-                          "3) Industrial N deposition value.")
-    ),
-    defineParameter("dailyOutput", "numeric", c(20, 21, 38, 40, 42, 43, 44, 70, 509, 528, 620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639, 579), NA, NA, 
-                    paste("The indices of the daily output variable(s) requested.",
-                          "There are >500 possible variables.")
-    ),
     defineParameter("annualOutput", "numeric", c(545, 636, 637, 638, 639, 307), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables.")
-    ),
-    defineParameter("maxSpinupYears", "integer", 6000L, NA, NA, 
-                    paste("The maximum number of simulation for a spinup run.")
-    ),
-    defineParameter("climateChangeOptions", "numberic", c(0, 0, 1, 1, 1), NA, NA, 
-                    paste("Entries in the CLIMATE_CHANGE section of the ini file.",
-                          "The entries are: offset for Tmax, offset for Tmin",
-                          "multiplier for prcp, multiplier for vpd, and muliplier",
-                          "for srad.")
-    ),
-    defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, NA, NA, NA), NA, NA, 
-                    paste("A vector with site information:",
-                          "1: effective soil depth",
-                          "2: sand percentage",
-                          "3: silt percentage",
-                          "4: clay percentage",
-                          "5: site elevation in meters", 
-                          "6: site latitude in decimal degrees",
-                          "7: site shortwave albedo",
-                          "8: annual rate of atmospheric nitrogen deposition",
-                          "9: annual rate of symbiotic+asymbiotic nitrogen fixation",
-                          "The non-na constants will be retrieved in various sources.")
-    ),
-    defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA, 
-                    paste("2-number vector for initial water conditions:",
-                          "1: initial snowpack water content (kg/m2)",
-                          "2: intial soil water content as a proportion of saturation (DIM)",
-                          "If set to NA, the initial snowpack water content will be retrieved by an external source.")
     ),
     defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA, 
                     paste("11-number vector for initial carbon conditions:",
@@ -103,14 +42,61 @@ defineModule(sim, list(
                           "11: soil carbon, slowest pool (kgC/m2)"
                     )
     ),
+    defineParameter("climModel", "character", "RCM4", NA, NA, 
+                    paste("A climatic model to extract meteorological data.",
+                          "Either 'RCM4', 'GCM4', or 'Hadley'.")
+    ),
+    defineParameter("climateChangeOptions", "numeric", c(0, 0, 1, 1, 1), NA, NA, 
+                    paste("Entries in the CLIMATE_CHANGE section of the ini file.",
+                          "The entries are: offset for Tmax, offset for Tmin",
+                          "multiplier for prcp, multiplier for vpd, and muliplier",
+                          "for srad.")
+    ),
+    defineParameter("co2scenario", "character", "RCP45", NA, NA, 
+                    paste("An representative concentration pathway for the co2",
+                    "concentration trajectories and meteorological data.",
+                    "Either 'RCP45' or 'RCP85'.")
+    ),
+    defineParameter("dailyOutput", "numeric", c(20, 21, 38, 40, 42, 43, 44, 70, 509, 528, 620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639, 579), NA, NA, 
+                    paste("The indices of the daily output variable(s) requested.",
+                          "There are >500 possible variables.")
+    ),
+    defineParameter("maxSpinupYears", "integer", 6000L, NA, NA, 
+                    paste("The maximum number of simulation for a spinup run.")
+    ),
+    defineParameter("NDepositionLevel", "numeric", c(1, NA, NA), NA, NA, 
+                    paste("A 3-number vector:",
+                          "1) Keep nitrogen deposition level constant (0) or vary according to the time trajectory of CO2 mole fractions (1).",
+                          "2) The reference year for N deposition (only used when N-deposition varies).",
+                          "3) Industrial N deposition value.")
+    ),
     defineParameter("nitrogenState", "numeric", c(0, 0), NA, NA, 
                     paste("2-number vector for initial nitrogen conditions:",
                           "1: litter nitrogen associated with labile litter carbon pool (kgN/m2)",
                           "2: soil mineral nitrogen pool (kgN/m2)")
     ),
+    defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, NA, NA, NA), NA, NA, 
+                    paste("A vector with site information:",
+                          "1: effective soil depth",
+                          "2: sand percentage",
+                          "3: silt percentage",
+                          "4: clay percentage",
+                          "5: site elevation in meters", 
+                          "6: site latitude in decimal degrees",
+                          "7: site shortwave albedo",
+                          "8: annual rate of atmospheric nitrogen deposition",
+                          "9: annual rate of symbiotic+asymbiotic nitrogen fixation",
+                          "The non-na constants will be retrieved in various sources.")
+    ),
     defineParameter("siteNames", "character", "site1", NA, NA, 
                     paste("The names of the study sites. If not provided, a number from",
                           "1 to the number of study sites will be used.")
+    ),
+    defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA, 
+                    paste("2-number vector for initial water conditions:",
+                          "1: initial snowpack water content (kg/m2)",
+                          "2: intial soil water content as a proportion of saturation (DIM)",
+                          "If set to NA, the initial snowpack water content will be retrieved by an external source.")
     ),
     defineParameter(".plots", "character", "screen", NA, NA,
                     "Used by Plots function, which can be optionally used here"),
@@ -132,34 +118,33 @@ defineModule(sim, list(
                     "Should caching of events or module be used?")
   ),
   inputObjects = bindrows(
-    expectsInput("studyArea", "SpatVector",
-                 desc = paste("Polygons to use as the study area. Must be supplied by the user.",
-                              "One polygon per study site.")
+    expectsInput("CO2concentration", "data.frame", 
+                 desc = paste("CO2 concentration for each year.")
     ),
-    expectsInput("sppEquiv", "data.frame",
-                desc = paste(
-                  "A data frame to link the leading species map to ecophysiological constants.",
-                  "The columns are speciesId, species, genus, functional plant type.")
-    ), 
     expectsInput("dominantSpecies", "SpatRaster",
-                desc = paste(
-                  "A raster with the leading tree species (speciesId).",
-                  "Use to determine the ecophysiological constants.",
-                  "By default, the NTEMS dominant tree species layer for the starting year is used.")
-    ), 
-    expectsInput("soilTextures", "SpatRaster",
                  desc = paste(
-                   "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
-                   "The across-layers sum needs to equal to 1 for each pixels."
-                 ),
-                 sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
+                   "A raster with the leading tree species (speciesId).",
+                   "Use to determine the ecophysiological constants.",
+                   "By default, the NTEMS dominant tree species layer for the starting year is used.")
     ), 
+    expectsInput("ecophysiologicalConstants", "data.frame", 
+                 desc = paste(
+                   "Ecophysiological constants. Columns are species, genus, and",
+                   "the ecological constants (see template). By default,",
+                   "ecophysiologicalConstants are built from White et al., 2000.")
+    ),
     expectsInput("elevation", "SpatRaster",
                  desc = paste(
                    "An elevation (m) raster. By default, the raster will be extracted from",
                    "AWS Terrain Tiles with the elevatr package."
                  ),
                  sourceURL = "https://registry.opendata.aws/terrain-tiles/"
+    ),
+    expectsInput("meteorologicalData", "list", 
+                 desc = paste("List of data.frames with the meteorological data",
+                              "for each study site. The units are `deg C`",
+                              "for Tmax, Tmin, and Tday, `cm` for prcp, `Pa` for",
+                              "VPD, `W/m^2` for srad, and `s` for daylen.")
     ),
     expectsInput("Ndeposition", "SpatRaster",
                  desc = paste(
@@ -183,20 +168,21 @@ defineModule(sim, list(
                  ),
                  sourceURL = "https://climate-scenarios.canada.ca/?page=blended-snow-data"
     ), 
-    expectsInput("ecophysiologicalConstants", "data.frame", 
+    expectsInput("soilTextures", "SpatRaster",
                  desc = paste(
-                   "Ecophysiological constants. Columns are species, genus, and",
-                   "the ecological constants (see template). By default,",
-                   "ecophysiologicalConstants are built from White et al., 2000.")
-    ),
-    expectsInput("meteorologicalData", "list", 
-                 desc = paste("List of data.frames with the meteorological data",
-                              "for each study site. The units are `deg C`",
-                              "for Tmax, Tmin, and Tday, `cm` for prcp, `Pa` for",
-                              "VPD, `W/m^2` for srad, and `s` for daylen.")
-    ),
-    expectsInput("CO2concentration", "data.frame", 
-                 desc = paste("CO2 concentration for each year.")
+                   "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
+                   "The across-layers sum needs to equal to 1 for each pixels."
+                 ),
+                 sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
+    ), 
+    expectsInput("sppEquiv", "data.frame",
+                desc = paste(
+                  "A data frame to link the leading species map to ecophysiological constants.",
+                  "The columns are speciesId, species, genus, functional plant type.")
+    ), 
+    expectsInput("studyArea", "SpatVector",
+                 desc = paste("Polygons to use as the study area. Must be supplied by the user.",
+                              "One polygon per study site.")
     )
   ),
   outputObjects = bindrows(

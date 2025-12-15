@@ -149,12 +149,12 @@ metRead <- function(fileName, nHeaderLines = 4){
   return(metData)
 }
 
-metWrite <- function(metData, fileName, studyArea = "XXXX", dataSource = "XXXX"){
+metWrite <- function(metData, fileName, siteName = "XXXX", dataSource = "XXXX"){
   # Create and enter file
   sink(fileName)
   
   # First row with study name and year range
-  cat(studyArea, ",", sep = "")
+  cat(siteName, ",", sep = "")
   cat(paste(range(metData$year), collapse = "-"))
   cat("\n")
   
