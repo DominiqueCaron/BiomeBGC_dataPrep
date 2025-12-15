@@ -21,7 +21,7 @@ defineModule(sim, list(
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
   reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", 
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
-                  "RNCan/BioSimClient_R"),
+                  "RNCan/BioSimClient_R", "geosphere"),
   parameters = bindrows(
     defineParameter("epcDataSource", "character", NA, NA, NA, 
                     paste("Three options:",
@@ -30,6 +30,9 @@ defineModule(sim, list(
                           "2) One of the Biome-BGC default epc files (e.g., \"enf\")",
                           "A single default can be used or one per study site.",
                           "3) The source from which ecophysiological constants are extracted (TBD).")
+    ),
+    defineParameter("climModel", "character", NA, NA, NA, 
+                    paste("")
     ),
     defineParameter("metDataSource", "character", NA, NA, NA, 
                     paste("Two options:",
@@ -604,19 +607,16 @@ prepareIni <- function(sim) {
   }
   
   if (!suppliedElsewhere('meteorologicalData', sim)) {
-    if(is.na(P(sim)$metDataSource)){
-      stop("Either meteorologicalData or the parameter metDataSource needs to be provided.")
-    } else {
-      dir.create(file.path(inputPath(sim), "metdata"), showWarnings = FALSE)
-      newFileName <- file.path(inputPath(sim), "metdata", basename(P(sim)$metDataSource))
-      file.copy(P(sim)$metDataSource, 
-                newFileName,
-                overwrite = T
-      )
-      sim$meteorologicalData <- metRead(newFileName)
-    }
-  } else if (!is.na(P(sim)$metDataSource)) {
-    message("Using provided meterological data, ignoring parameter metDataSource.")
+    
+    sim$meteorologicalData <- prepClimate(
+      studyArea = sim$studyArea,
+      siteName = P(sim)$siteNames,
+      firstYear = start(sim),
+      lastYear = end(sim),
+      scenario = P(sim)$co2scenario,
+      climModel = P(sim)$climModel,
+      destinationPath= dPath
+    )
   }
   
   if (!suppliedElsewhere('CO2concentration', sim)) {

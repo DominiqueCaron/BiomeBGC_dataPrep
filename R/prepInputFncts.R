@@ -310,6 +310,8 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
 }
 
 prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, climModel){
+  dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
+  
   # get latitude and longitude
   latlon <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84")), 2)
   lon <- latlon[1]
@@ -318,12 +320,48 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
   # get climate
   climate <- generateWeather(c("Climatic_Daily", "VaporPressureDeficit_Daily"), firstYear, lastYear, siteName, lat, lon, rcp = scenario, climModel = climModel, additionalParms = NULL)
   
-  # fix leap years and organize columns
+  # remove 1 day from leap years (February 29)
+  climate <- lapply(climate, FUN = function(x){
+    x <- x[x$Month != 2 | x$Day != 29,]
+  })
   
-  # get day length
-  daylen <- daylength(lat, 1:365)
+  # get day length in second
+  daylen <- daylength(lat, 1:365) * 60 * 60
 
-    
+  
+  # format climate data
+  climate <- data.frame(
+    year = climate[["Climatic_Daily"]]$Year,
+    yday = 1:365,
+    tmax = climate[["Climatic_Daily"]]$Tmax,
+    tmin = climate[["Climatic_Daily"]]$Tmin,
+    tday = climate[["Climatic_Daily"]]$Tair,
+    prcp = climate[["Climatic_Daily"]]$Prcp,
+    vpd = climate[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit,
+    srad = climate[["Climatic_Daily"]]$SRad,
+    daylen = daylen
+  )
+  
+  # write to inputs
+  fileName <- tolower(paste0(
+    siteName,
+    "_",
+    climModel,
+    scenario,
+    "_",
+    firstYear,
+    lastYear,
+    ".mtc43"
+  ))
+  
+  metWrite(
+    metData = climate,
+    fileName = fileName,
+    siteName  = siteName,
+    dataSource = paste(climModel, scenario, sep = ": ")
+  )
+  
+  return(climate)
 }
 
 getEPC <- function(epcTable, sppEquiv){
