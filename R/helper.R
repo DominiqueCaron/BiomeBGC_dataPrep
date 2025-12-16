@@ -3,7 +3,7 @@
 # epcParseLine
 # epcWrite2
 # epcWrite
-# metRead
+# metRead (not used)
 # metWrite
 # CO2Read
 # CO2Write
@@ -12,7 +12,8 @@
 # getEPC
 # lccToAlbedo
 
-### EPC helper function
+#### EPC helper functions ####
+# reads .epc files
 epcRead <- function(fileName, readValues = TRUE, readMeta = TRUE){
   # Get path to the default epc files if using one of them.
   if(fileName %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
@@ -68,6 +69,7 @@ epcRead <- function(fileName, readValues = TRUE, readMeta = TRUE){
   return(epc)
 }
 
+# parse a single line in epc files.
 epcParseLine <- function(epcLine){
   # The value comes first and is followed by >=2 spaces
   epcValue <- strsplit(epcLine, "\\s{1,}")[[1]][1]
@@ -86,6 +88,7 @@ epcParseLine <- function(epcLine){
   return(c(epcDescription, epcUnit, epcValue))
 }
 
+# writes a .epc file from the ecophysiologicalConstants input
 epcWrite2 <- function(epc, destinationPath){
   # Get a template
   epcTemplate <- file.path(
@@ -104,6 +107,7 @@ epcWrite2 <- function(epc, destinationPath){
   epcWrite(epcOut, fileName = fileName)
 }
 
+# writes a .epc file from a formatted data.frame
 epcWrite <- function(epc, fileName){
   # Create and enter file
   sink(fileName)
@@ -145,77 +149,7 @@ epcWrite <- function(epc, fileName){
 sink()
 }
 
-### MET helper function
-# Currently not used.
-metRead <- function(fileName, nHeaderLines = 4){
-  # Always the same 9 variables
-  colNames <- c("year", "yday", "tmax", "tmin", "tday", "prcp", "vpd", "srad", "daylen")
-  
-  # Read data, skip header
-  metData <- read.table(fileName, skip = nHeaderLines, col.names = colNames)
-  
-  return(metData)
-}
-
-metWrite <- function(metData, fileName, siteName = "XXXX", dataSource = "XXXX"){
-  # Create and enter file
-  sink(fileName)
-  
-  # First row with study name and year range
-  cat(siteName, ",", sep = "")
-  cat(paste(range(metData$year), collapse = "-"))
-  cat("\n")
-  
-  # Second row on information about the source of the data
-  cat(dataSource, "OUTPUT FILE :", format(Sys.time(), "%a %b %d %X %Y"))
-  cat("\n")
-  
-  # Third row is the variable names (always the same)
-  cat("  year  yday    Tmax    Tmin    Tday    prcp      VPD     srad  daylen")
-  cat("\n")
-  
-  # Fourth row is the variable units (always the same)
-  cat("             (deg C) (deg C) (deg C)    (cm)     (Pa)  (W m-2)     (s)")
-  cat("\n")
-  
-  # The rest are the data.
-  # Following a template to make a clean file
-  for (i in 1:nrow(metData)){
-    # 6 characters for year and yday
-    cat(formatC(metData[i, 1], width = 6))
-    cat(formatC(metData[i, 2], width = 6))
-    # 8 character for Tmax, Tmin, Tday, and prcp
-    cat(formatC(metData[i, 3], digits = 2, format = "f", width = 8))
-    cat(formatC(metData[i, 4], digits = 2, format = "f", width = 8))
-    cat(formatC(metData[i, 5], digits = 2, format = "f", width = 8))
-    cat(formatC(metData[i, 6], digits = 2, format = "f", width = 8))
-    # 9 characters for prcp and VPD
-    cat(formatC(metData[i, 7], digits = 2, format = "f", width = 9))
-    cat(formatC(metData[i, 8], digits = 2, format = "f", width = 9))
-    # 8 characters for daylen
-    cat(formatC(metData[i, 9], format = "d", width = 8))
-    cat("\n")
-  }
-  sink()
-}
-
-## CO2 helper function
-# currently not used
-CO2Read <- function(fileName){
-  fileName <- "~/repos/BiomeBGCR/inst/inputs/co2/co2.txt"
-  co2Data <- read.table(fileName, col.names = c("year", "concentration"))
-  return(co2Data)
-}
-
-
-CO2write <- function(co2Data, fileName){
-  write.table(co2Data, 
-              file = fileName, 
-              sep = "\t", 
-              row.names = FALSE, 
-              col.names = FALSE)
-}
-
+# Makes sure that the sums of proportions in epc sum to 1
 assertEPCproportions <- function(epc){
   # check Litter proportions
   ## If there is only one missing, fill by subtracting the sum of the other two to 1
@@ -252,7 +186,7 @@ assertEPCproportions <- function(epc){
   epc[FRProportionN == 3 & FRProportionSum != 1, fineRootLigninProportion := fineRootLigninProportion / FRProportionSum]
   epc[ , FRProportionN := NULL]
   epc[ , FRProportionSum := NULL]
- 
+  
   # and finally with dead wood
   ## If there is only one missing, fill by subtracting the sum of the other two to 1
   epc[, DWProportionN :=
@@ -271,6 +205,7 @@ assertEPCproportions <- function(epc){
   return(epc)
 }
 
+# Initiates an epc data.frame with correct column names
 initiateEPC <- function() {
   return(
     data.frame(
@@ -323,6 +258,8 @@ initiateEPC <- function() {
   )
 }
 
+# Get the ecophysiological constants for species in sppEquiv. Starts by retrieving
+# species-level epc, then tries genus-level, and finally plant functional type level.
 getEPC <- function(epcTable, sppEquiv){
   epcSpecies <- epcTable[level == "Species"]
   epcGenus <- epcTable[level == "Genus", ]
@@ -354,6 +291,85 @@ getEPC <- function(epcTable, sppEquiv){
   return(res)
 }
 
+#### MET helper functions ####
+
+# Reads .mtc43 data
+# Currently not used.
+metRead <- function(fileName, nHeaderLines = 4){
+  # Always the same 9 variables
+  colNames <- c("year", "yday", "tmax", "tmin", "tday", "prcp", "vpd", "srad", "daylen")
+  
+  # Read data, skip header
+  metData <- read.table(fileName, skip = nHeaderLines, col.names = colNames)
+  
+  return(metData)
+}
+
+# Write .mtc43 data
+metWrite <- function(metData, fileName, siteName = "XXXX", dataSource = "XXXX"){
+  # Create and enter file
+  sink(fileName)
+  
+  # First row with study name and year range
+  cat(siteName, ",", sep = "")
+  cat(paste(range(metData$year), collapse = "-"))
+  cat("\n")
+  
+  # Second row on information about the source of the data
+  cat(dataSource, "OUTPUT FILE :", format(Sys.time(), "%a %b %d %X %Y"))
+  cat("\n")
+  
+  # Third row is the variable names (always the same)
+  cat("  year  yday    Tmax    Tmin    Tday    prcp      VPD     srad  daylen")
+  cat("\n")
+  
+  # Fourth row is the variable units (always the same)
+  cat("             (deg C) (deg C) (deg C)    (cm)     (Pa)  (W m-2)     (s)")
+  cat("\n")
+  
+  # The rest are the data.
+  # Following a template to make a clean file
+  for (i in 1:nrow(metData)){
+    # 6 characters for year and yday
+    cat(formatC(metData[i, 1], width = 6))
+    cat(formatC(metData[i, 2], width = 6))
+    # 8 character for Tmax, Tmin, Tday, and prcp
+    cat(formatC(metData[i, 3], digits = 2, format = "f", width = 8))
+    cat(formatC(metData[i, 4], digits = 2, format = "f", width = 8))
+    cat(formatC(metData[i, 5], digits = 2, format = "f", width = 8))
+    cat(formatC(metData[i, 6], digits = 2, format = "f", width = 8))
+    # 9 characters for prcp and VPD
+    cat(formatC(metData[i, 7], digits = 2, format = "f", width = 9))
+    cat(formatC(metData[i, 8], digits = 2, format = "f", width = 9))
+    # 8 characters for daylen
+    cat(formatC(metData[i, 9], format = "d", width = 8))
+    cat("\n")
+  }
+  sink()
+}
+
+#### CO2 helper function ####
+
+# reads co2 concentration data file
+# currently not used
+CO2Read <- function(fileName){
+  fileName <- "~/repos/BiomeBGCR/inst/inputs/co2/co2.txt"
+  co2Data <- read.table(fileName, col.names = c("year", "concentration"))
+  return(co2Data)
+}
+
+# writes co2 concentration data file
+CO2write <- function(co2Data, fileName){
+  write.table(co2Data, 
+              file = fileName, 
+              sep = "\t", 
+              row.names = FALSE, 
+              col.names = FALSE)
+}
+
+#### Albedo helper functions ####
+
+# Gets the soil albedo given the land cover class and latitude. 
 # NFI land cover class values:
 # 1 = Bryoid
 # 2 = Herbs

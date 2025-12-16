@@ -7,6 +7,7 @@
 # prepWhite2010EPC
 # prepClimate
 
+# Extract % of sand, % of clay and % of silt from CanSIS dataset
 prepSoilTexture <- function(destinationPath, studyArea){
   sand <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
@@ -28,6 +29,7 @@ prepSoilTexture <- function(destinationPath, studyArea){
   return(soilTexture)
 }
 
+# Extract N-deposition data for 2 years.
 prepNdeposition <- function(destinationPath, studyArea, year1, year2){
   Ndeposition1 <- prepInputs(
     targetFile = paste0("mean_totN_", year1, "_hm.tif"),
@@ -54,6 +56,7 @@ prepNdeposition <- function(destinationPath, studyArea, year1, year2){
   return(Ndeposition)
 }
 
+# Get the albedo per land cover
 rvestAlbedoTable <- function(){
   
   # extract Table 1 of Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
@@ -76,6 +79,7 @@ rvestAlbedoTable <- function(){
   return(as.data.frame(shortwaveAlbedo))
 }
 
+# Get the co2 concentration for a period for different representative concentration pathways (RCPs)
 prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath){
   dir.create(file.path(destinationPath, "co2"), showWarnings = FALSE)
   if (!(scenario %in% c("RCP26", "RCP45", "RCP60", "RCP85"))) {
@@ -108,25 +112,38 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
   return(co2concentrations)
 }
 
+# Clean and format tables from White et al., 2010 (EPC constant)
 prepWhite2010Table <- function(tbl, value.var){
+  # Remove plant functional types
   tbl <- tbl[tbl$Foliage.Nature %in% c("Evergreen needle leaf forest", "Deciduous broad leaf forest"),]
+  # Remove extra-spaces
   tbl$Species <- trimws(tbl$Species)
+  # Standardize genus-level taxa
   tbl$Species <- gsub(pattern = " spp.", "", tbl$Species)
+  # Transform into wide format
   tbl <- dcast(as.data.table(tbl), Species ~ Parameter, value.var = value.var, fun.aggregate = mean)
+  # Extract genus
   tbl[, Genus := sub(" .*", "", Species)]
+  # Table of species-level constants
   tbl_sp <- tbl[Species != Genus, ]
   tbl_sp[, Genus := NULL]
   tbl_sp[, Level := "Species"]
+  # Table of genus-level constants - take mean across species
   tbl[, Species := NULL]
   tbl_genus <- tbl[, lapply(.SD, mean, na.rm = TRUE), by = Genus]
   tbl_genus[, Level := "Genus"]
   setnames(tbl_genus, "Genus", "Species")
+  # Combine genus and species-level constants
   out <- rbindlist(list(tbl_sp, tbl_genus))
   return(out)
 }
 
+# Prepares epc from the tables in white et al., 2010
 prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
+  # create a folder for epc in the destinationPath
   dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
+  
+  # get a epc template file
   epc <- initiateEPC()
   
   ## append the enf and dbf plant functional types
@@ -229,13 +246,18 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   white2010 <- merge(white2010, white2010_4, by = c("taxa", "level"), all = TRUE)
   
   epc <- rbindlist(list(epc, white2010), fill = TRUE)
+  # check that the sums of proportions equal to 1
   epc <- assertEPCproportions(epc)
+  # Get the correct epc for the species in sppEquiv
   epc <- getEPC(epc, sppEquiv)
+  # Write the species-level epcs in the destinationPath/epc folder
   apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   return(epc)
 }
 
+# Extract the meteorological data
 prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, climModel, destinationPath){
+  # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude
