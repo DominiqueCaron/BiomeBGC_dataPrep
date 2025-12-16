@@ -243,8 +243,18 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
   lon <- latlon[1]
   lat <- latlon[2]
   
-  # get climate
-  climate <- generateWeather(c("Climatic_Daily", "VaporPressureDeficit_Daily"), firstYear, lastYear, siteName, lat, lon, rcp = scenario, climModel = climModel, additionalParms = NULL)
+  # get climate from BioSim
+  climate <- generateWeather(
+    modelNames = c("Climatic_Daily", "VaporPressureDeficit_Daily"),
+    fromYr = firstYear,
+    toYr = lastYear,
+    id = siteName,
+    latDeg = lat,
+    longDeg = lon,
+    rcp = scenario,
+    climModel = climModel,
+    additionalParms = NULL
+  )
   
   # remove 1 day from leap years (February 29)
   climate <- lapply(climate, FUN = function(x){
