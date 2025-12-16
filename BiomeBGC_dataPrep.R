@@ -19,9 +19,9 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
-  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", 
+  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/LandR@development"
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
-                  "RNCan/BioSimClient_R", "geosphere", "BioSIM"),
+                  "RNCan/BioSimClient_R", "geosphere"),
   parameters = bindrows(
     defineParameter("annualOutput", "numeric", c(545, 636, 637, 638, 639, 307), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
@@ -89,8 +89,7 @@ defineModule(sim, list(
                           "The non-na constants will be retrieved in various sources.")
     ),
     defineParameter("siteNames", "character", "site1", NA, NA, 
-                    paste("The names of the study sites. If not provided, a number from",
-                          "1 to the number of study sites will be used.")
+                    paste("The names of the study sites.")
     ),
     defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA, 
                     paste("2-number vector for initial water conditions:",
@@ -485,6 +484,7 @@ prepareIni <- function(sim) {
   }
   
   # Dominant species layer
+  # Default source: NTEMS dominant species layer for the 1st year of simulation
   if (!suppliedElsewhere('dominantSpecies', sim)) {
     sim$dominantSpecies <- LandR::prepInputs_NTEMS_DominantSpecies(
       year = start(sim),
@@ -494,6 +494,7 @@ prepareIni <- function(sim) {
     ) |> Cache()
   }
   
+  # Table to link the dominant species to traits of White et al., 2000
   if (!suppliedElsewhere('sppEquiv', sim)) {
     sppEquiv <- LandR::sppEquivalencies_CA[, c("LandR", "Latin_full", "Type")]
     sppEquiv <- sppEquiv[sppEquiv$Latin_full != "",]
@@ -509,18 +510,21 @@ prepareIni <- function(sim) {
     sim$sppEquiv <- sppEquiv[!duplicated(sppEquiv$speciesId),]
   }
   
+  # Table of ecophysiological constants of each species Id
+  # Default source: White et al., 2000 https://doi.org/10.1175/1087-3562(2000)004<0003:PASAOT>2.0.CO;2
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
     
     sim$ecophysiologicalConstants <- prepWhite2010EPC(
       url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link",
       sppEquiv = sim$sppEquiv,
       destinationPath = dPath
-    ) 
+    ) |> Cache()
     
   }
   
-  
   # Soil texture (% sand, % silt, % clay)
+  # Default sources: CanSIS Soil Landscape Grids of Canada
+  # Using the 15-30cm depth layer
   if (!suppliedElsewhere('soilTexture', sim)) {
     sim$soilTexture <- prepSoilTexture(
       destinationPath = dPath,
@@ -529,6 +533,7 @@ prepareIni <- function(sim) {
   }
   
   # Elevation raster
+  # Default source: Amazon Web Services Terrain Tiles
   if (!suppliedElsewhere('elevation', sim)) {
     sim$elevation <-  get_elev_raster(
       locations = sf::st_as_sf(sim$studyArea),
@@ -538,6 +543,7 @@ prepareIni <- function(sim) {
   }
   
   # Total N deposition
+  # Default source: Zhu et al., 2025: https://doi.org/10.1038/s41467-024-55606-y
   if (!suppliedElsewhere('Ndeposition', sim)) {
     year1 <- max(start(sim), 2008)
     year2 <- min(end(sim), 2020)
@@ -550,6 +556,7 @@ prepareIni <- function(sim) {
   }
   
   # Total N fixation rates
+  # Default source Reis Ely et al., 2025: https://doi.org/10.1038/s41597-025-05131-4
   if (!suppliedElsewhere('NFixationRates', sim)) {
     sim$NfixationRates <- prepInputs(
       targetFile = "BNF_total_central_1.tif",
@@ -563,25 +570,37 @@ prepareIni <- function(sim) {
     sim$NfixationRates <- sim$NfixationRates/10000 # convert from kg/ha/yr to kg/m2/yr
   }
   
+  # Initial snowpack water content
+  # Default source: ECC snow water equivalent (SWE) over the Northern Hemisphere
+  # Methods: Mudryk et al., 2015: https://doi.org/10.1175/JCLI-D-15-0229.1
   if (!suppliedElsewhere('snowpackWaterContent', sim)) {
+    
+    # data is available for 1981-2020
+    yearToUse <- min(max(start(sim), 1981), 2020)
+    if(yearToUse != start(sim)){
+      message("Snowpack water content data is not available for ",
+              start(sim), ", using data of ", yearToUse)
+    }
+    
+    # Get data
     sim$snowpackWaterContent <- prepInputs(
-      targetFile = "SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
-      url = "https://climate-scenarios.canada.ca/files/SWE_SCF_obs/SWE_obsMEAN4xfremonthly_1981-2016.LF.nc",
+      targetFile = "swe_monthly_mm_1981-2020.nc",
+      url = "https://climate-scenarios.canada.ca/files/blended_snow_2024/swe_monthly_mm_1981-2020.zip",
       fun = "terra::rast",
       destinationPath = dPath,
       cropTo = buffer(sim$studyArea, 1000),
       projectTo = crs(sim$studyArea)
     ) |> Cache()
-    yearToUse <- min(max(start(sim), 1981), 2016)
-    if(yearToUse != start(sim)){
-      message("Snowpack water content data is not available for year ",
-              start(sim), ", using data of year ", yearToUse)
-    }
+
+    # We use the average for January of the first year.
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
-    sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]] * 1000 # We want mm (equivalent to kg/m2)
+    sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]]
     terra::units(sim$snowpackWaterContent) <- "kg/m^2"
   }
   
+  # Shortwave Albedo
+  # Default source: Based on SCANFI landcover and albedo of land cover type in 
+  # Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
   if (!suppliedElsewhere('shortwaveAlbedo', sim)) {
     lcc <- prepInputs(url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
                       destinationPath= dPath,
@@ -592,6 +611,8 @@ prepareIni <- function(sim) {
     sim$shortwaveAlbedo <- lccToAlbedo(lcc[,2], albedoTable, sim$studyArea)
   }
   
+  # Meteorological data
+  # Default source: BioSIM
   if (!suppliedElsewhere('meteorologicalData', sim)) {
     
     sim$meteorologicalData <- prepClimate(
@@ -605,6 +626,9 @@ prepareIni <- function(sim) {
     )
   }
   
+  # CO2 atmospheric concentration
+  # Default source: Emission data for the different RCPs downloaded from
+  # Folini et al., 2025: https://doi.org/10.1093/restud/rdae011
   if (!suppliedElsewhere('CO2concentration', sim)) {
     
     sim$CO2concentration <- prepCo2Concentration(

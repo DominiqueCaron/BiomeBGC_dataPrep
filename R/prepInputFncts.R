@@ -1,38 +1,11 @@
-prepEPC <- function(dataSource, destinationPath, to = NULL){
-  dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
-  # Option 1: Getting epc from default functional types and based on landcover. 
-  if (dataSource == "functionalTypes"){
-    lcc <- prepInputs(url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
-                      destinationPath= destinationPath,
-                      cropTo = buffer(to, 30),
-                      projectTo = crs(to)) |> Cache()
-    lcc <- extract(lcc, to)
-    functionalTypes <- lccToFuncType(lcc[, 2])
-    epc <- lapply(functionalTypes, prepEPC, destinationPath)
-    
-  } else {
-    # Option 2: User sets the functional type to uses
-    if(dataSource %in% c("c3grass", "c4grass", "dbf", "dnf", "ebf", "enf", "shrub")){
-      fileName <- file.path(
-        system.file("inputs", package = "BiomeBGCR"),
-        "epc",
-        paste0(dataSource, ".epc")
-      )
-    } else {
-      # Option 3: User provides the path to the epc file.
-      fileName <- dataSource
-    }
-    # Copy the epc file in the input folder
-    newFileName <- file.path(destinationPath, "epc", basename(fileName))
-    file.copy(fileName, 
-              newFileName,
-              overwrite = T
-    )
-    epc <- epcRead(newFileName)
-  }
-  return(epc)
-}
-
+## Functions used to in the .inputObjects event:
+# prepSoilTexture
+# prepNdeposition
+# rvestAlbedoTable
+# prepCo2Concentration
+# prepWhite2010Table
+# prepWhite2010EPC
+# prepClimate
 
 prepSoilTexture <- function(destinationPath, studyArea){
   sand <- prepInputs(
@@ -79,60 +52,6 @@ prepNdeposition <- function(destinationPath, studyArea, year1, year2){
   Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
   names(Ndeposition) <- as.character(c(year1, year2))
   return(Ndeposition)
-}
-
-# NFI land cover class values:
-# 1 = Bryoid
-# 2 = Herbs
-# 3 = Rock
-# 4 = Shrub
-# 5 = Tree cover is mainly “Treed broadleaf”
-# 6 = Tree cover is mainly “Treed conifer”
-# 7 = Tree cover is mainly “Treed mixed”
-# 8 = Water
-lccToFuncType <- function(lcc){
-  if (any(lcc %in% c(1,3,8))){
-    stop("One of the study site is bryoids, rock or water.")
-  }
-  # All herbs are set as c3grass- TODO: is that ok??
-  funcType <- rep("c3grass", length(lcc))
-  funcType[lcc == 4] <- "shrub"
-  funcType[lcc == 5] <- "dbf"
-  funcType[lcc == 6] <- "enf"
-  # Mixed forests?? set as evergreen needleleaf forest. TODO: is that ok??
-  funcType[lcc == 7] <- "enf"
-}
-
-# NFI land cover class values:
-# 1 = Bryoid
-# 2 = Herbs
-# 3 = Rock
-# 4 = Shrub
-# 5 = Tree cover is mainly “Treed broadleaf”
-# 6 = Tree cover is mainly “Treed conifer”
-# 7 = Tree cover is mainly “Treed mixed”
-# 8 = Water
-lccToAlbedo <- function(lcc, albedoTable, studyArea){
-  if (any(lcc %in% c(1,3,8))){
-    stop("One of the study site is bryoids, rock or water.")
-  }
-  latitude <- crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2]
-  if(latitude > 60){
-    colId <- 3
-  } else if (latitude > 50){
-    colId <- 4
-  } else if (latitude > 40){
-    colId <- 5
-  } else {
-    colId <- 6
-  }
-  albedo <- rep(0.2, length(lcc))
-  albedo[lcc == 2] <- albedoTable[7, colId]
-  albedo[lcc == 4] <- albedoTable[5, colId]
-  albedo[lcc == 5] <- albedoTable[3, colId]
-  albedo[lcc == 6] <- albedoTable[1, colId]
-  albedo[lcc == 7] <- albedoTable[4, colId]
-  return(round(albedo, digits = 2))
 }
 
 rvestAlbedoTable <- function(){
@@ -183,7 +102,8 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
   yearToKeep <- firstYear <= co2concentrations[,1] & co2concentrations[,1] <= lastYear
   co2concentrations <- co2concentrations[yearToKeep, ]
   fileName <- paste("co2", firstYear, lastYear, paste0(scenario, ".txt"), sep = "_")
-  write.table(co2concentrations, file = file.path(destinationPath, "co2", fileName))
+  CO2write(co2concentrations,
+           fileName = file.path(destinationPath, "co2", fileName))
   names(co2concentrations) <- c("year", "co2_ppm")
   return(co2concentrations)
 }
@@ -369,35 +289,4 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
   )
   
   return(climate)
-}
-
-getEPC <- function(epcTable, sppEquiv){
-  epcSpecies <- epcTable[level == "Species"]
-  epcGenus <- epcTable[level == "Genus", ]
-  epcPFT <- epcTable[level == "pft", ]
-  epc_cols <- colnames(epcTable[,-c(1,2)])
-  res <- as.data.table(sppEquiv)
-  
-  # 1. Species-level traits
-  res <- merge(res, epcSpecies, by.x = "species", by.y = "taxa", all.x = TRUE)
-  
-  # 2. Genus-level (adds trait.genus)
-  res <- merge(res, epcGenus, by.x = "genus", by.y = "taxa", all.x = TRUE, suffixes = c("", "_genus"))
-  
-  # 3. PFT-level (adds trait.pft)
-  res <- merge(res, epcPFT, by.x = "PFT", by.y = "taxa", all.x = TRUE, suffixes = c("", "_pft"))
-  
-  for (col in epc_cols) {
-    res[, (col) := fifelse(!is.na(get(col)), 
-                           get(col), 
-                           fifelse(!is.na(get(paste0(col, "_genus"))),
-                                   get(paste0(col, "_genus")),
-                                   get(paste0(col, "_pft"))
-                           )
-    )
-    ]
-  }
-  cols <- c("speciesId", "species", epc_cols)
-  res <- res[ , ..cols]
-  return(res)
 }

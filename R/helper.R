@@ -1,3 +1,17 @@
+## helper functions:
+# epcRead
+# epcParseLine
+# epcWrite2
+# epcWrite
+# metRead
+# metWrite
+# CO2Read
+# CO2Write
+# assertEPCproportions
+# initiateEPC
+# getEPC
+# lccToAlbedo
+
 ### EPC helper function
 epcRead <- function(fileName, readValues = TRUE, readMeta = TRUE){
   # Get path to the default epc files if using one of them.
@@ -132,8 +146,8 @@ sink()
 }
 
 ### MET helper function
+# Currently not used.
 metRead <- function(fileName, nHeaderLines = 4){
-  fileName <- "~/repos/BiomeBGCR/inst/inputs/metdata/miss5093.mtc41"
   # Always the same 9 variables
   colNames <- c("year", "yday", "tmax", "tmin", "tday", "prcp", "vpd", "srad", "daylen")
   
@@ -186,11 +200,13 @@ metWrite <- function(metData, fileName, siteName = "XXXX", dataSource = "XXXX"){
 }
 
 ## CO2 helper function
+# currently not used
 CO2Read <- function(fileName){
   fileName <- "~/repos/BiomeBGCR/inst/inputs/co2/co2.txt"
   co2Data <- read.table(fileName, col.names = c("year", "concentration"))
   return(co2Data)
 }
+
 
 CO2write <- function(co2Data, fileName){
   write.table(co2Data, 
@@ -305,4 +321,67 @@ initiateEPC <- function() {
       finalVaporPressureDeficit = numeric()
     )
   )
+}
+
+getEPC <- function(epcTable, sppEquiv){
+  epcSpecies <- epcTable[level == "Species"]
+  epcGenus <- epcTable[level == "Genus", ]
+  epcPFT <- epcTable[level == "pft", ]
+  epc_cols <- colnames(epcTable[,-c(1,2)])
+  res <- as.data.table(sppEquiv)
+  
+  # 1. Species-level traits
+  res <- merge(res, epcSpecies, by.x = "species", by.y = "taxa", all.x = TRUE)
+  
+  # 2. Genus-level (adds trait.genus)
+  res <- merge(res, epcGenus, by.x = "genus", by.y = "taxa", all.x = TRUE, suffixes = c("", "_genus"))
+  
+  # 3. PFT-level (adds trait.pft)
+  res <- merge(res, epcPFT, by.x = "PFT", by.y = "taxa", all.x = TRUE, suffixes = c("", "_pft"))
+  
+  for (col in epc_cols) {
+    res[, (col) := fifelse(!is.na(get(col)), 
+                           get(col), 
+                           fifelse(!is.na(get(paste0(col, "_genus"))),
+                                   get(paste0(col, "_genus")),
+                                   get(paste0(col, "_pft"))
+                           )
+    )
+    ]
+  }
+  cols <- c("speciesId", "species", epc_cols)
+  res <- res[ , ..cols]
+  return(res)
+}
+
+# NFI land cover class values:
+# 1 = Bryoid
+# 2 = Herbs
+# 3 = Rock
+# 4 = Shrub
+# 5 = Tree cover is mainly “Treed broadleaf”
+# 6 = Tree cover is mainly “Treed conifer”
+# 7 = Tree cover is mainly “Treed mixed”
+# 8 = Water
+lccToAlbedo <- function(lcc, albedoTable, studyArea){
+  if (any(lcc %in% c(1,3,8))){
+    stop("One of the study site is bryoids, rock or water.")
+  }
+  latitude <- crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2]
+  if(latitude > 60){
+    colId <- 3
+  } else if (latitude > 50){
+    colId <- 4
+  } else if (latitude > 40){
+    colId <- 5
+  } else {
+    colId <- 6
+  }
+  albedo <- rep(0.2, length(lcc))
+  albedo[lcc == 2] <- albedoTable[7, colId]
+  albedo[lcc == 4] <- albedoTable[5, colId]
+  albedo[lcc == 5] <- albedoTable[3, colId]
+  albedo[lcc == 6] <- albedoTable[1, colId]
+  albedo[lcc == 7] <- albedoTable[4, colId]
+  return(round(albedo, digits = 2))
 }
