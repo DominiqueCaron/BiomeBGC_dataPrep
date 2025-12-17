@@ -294,8 +294,8 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
     tmax = climate[["Climatic_Daily"]]$Tmax,
     tmin = climate[["Climatic_Daily"]]$Tmin,
     tday = climate[["Climatic_Daily"]]$Tair,
-    prcp = climate[["Climatic_Daily"]]$Prcp,
-    vpd = climate[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit,
+    prcp = climate[["Climatic_Daily"]]$Prcp/10, # from mm to cm
+    vpd = climate[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
     srad = climate[["Climatic_Daily"]]$SRad,
     daylen = daylen
   )

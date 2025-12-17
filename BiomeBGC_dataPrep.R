@@ -260,9 +260,18 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
   
   ## Set MET_INPUT section
+  fileName <- tolower(paste0(
+    P(sim)$siteName,
+    "_",
+    P(sim)$climModel,
+    P(sim)$co2scenario,
+    "_",
+    start(sim),
+    end(sim),
+    ".mtc43"
+  ))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
-                           file.path("inputs", "metdata", basename(basename(P(sim)$metDataSource)))
-  )
+                           file.path("inputs", "metdata", fileName))
   ## Set RESTART section
   # TODO: make sure that the 
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
@@ -284,15 +293,8 @@ prepareSpinupIni <- function(sim) {
   
   ## Set CO2_CONTROL section
   # TODO: make sure that co2 is always constant for the spinup. If so, which year?
-  # TODO: Get from external source
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
-  if (is.numeric(P(sim)$CO2DataSource)) {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, 
-                             P(sim)$CO2DataSource)
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, 
-                             sim$CO2concentration[sim$CO2concentration$year == start(sim), "concentration"])
-  }
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, sim$CO2concentration[sim$CO2concentration$year == start(sim), "co2_ppm"])
   
   ## Set SITE section
   # For each check if NA, if it is get the value from different sources
@@ -445,13 +447,12 @@ prepareIni <- function(sim) {
   bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
   
   # Change the CO2 section
-  if (!is.numeric(P(sim)$CO2DataSource)) {
-    bbgc.ini <- iniSet(bbgc.ini, "CO2_CONTROL", 1, 1)
-    bbgc.ini <- iniSet(bbgc.ini,
-                       "CO2_CONTROL",
-                       3,
-                       file.path("inputs", "co2", basename(P(sim)$CO2DataSource)))
-  }
+  fileName <- paste("co2", start(sim), end(sim), paste0(P(sim)$co2scenario, ".txt"), sep = "_")
+  bbgc.ini <- iniSet(bbgc.ini, "CO2_CONTROL", 1, 1)
+  bbgc.ini <- iniSet(bbgc.ini,
+                     "CO2_CONTROL",
+                     3,
+                     file.path("inputs", "co2", fileName))
   
   # Change the RAMP_NDEP section
   bbgc.ini <- iniSet(bbgc.ini, "RAMP_NDEP", 1, P(sim)$NDepositionLevel[1])
