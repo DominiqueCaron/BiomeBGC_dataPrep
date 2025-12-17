@@ -250,13 +250,14 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   epc <- assertEPCproportions(epc)
   # Get the correct epc for the species in sppEquiv
   epc <- getEPC(epc, sppEquiv)
+  epc <- assertEPCproportions(epc)
   # Write the species-level epcs in the destinationPath/epc folder
   apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   return(epc)
 }
 
 # Extract the meteorological data
-prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, climModel, destinationPath){
+prepClimate <- function(studyArea, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
@@ -285,7 +286,7 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
   
   # get day length in second
   daylen <- daylength(lat, 1:365) * 60 * 60
-
+  
   
   # format climate data
   climate <- data.frame(
@@ -297,10 +298,30 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
     prcp = climate[["Climatic_Daily"]]$Prcp/10, # from mm to cm
     vpd = climate[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
     srad = climate[["Climatic_Daily"]]$SRad,
-    daylen = daylen
+    daylen = daylen,
+    spinup = climate[["Climatic_Daily"]]$Year <= lastSpinupYear
   )
   
   # write to inputs
+  
+  # Met data for spinup
+  spinupFileName <- tolower(paste0(
+    siteName,
+    "_",
+    climModel,
+    scenario,
+    "_spinup.mtc43"
+  ))
+  spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
+  
+  metWrite(
+    metData = climate[climate$spinup, c(1:10)],
+    fileName = spinupFileName,
+    siteName  = siteName,
+    dataSource = paste(climModel, scenario, sep = ": ")
+  )
+  
+  # Met data for main simulation
   fileName <- tolower(paste0(
     siteName,
     "_",
@@ -314,7 +335,7 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, scenario, clim
   fileName <- file.path(destinationPath, "metdata", fileName)
   
   metWrite(
-    metData = climate,
+    metData = climate[, c(1:10)],
     fileName = fileName,
     siteName  = siteName,
     dataSource = paste(climModel, scenario, sep = ": ")

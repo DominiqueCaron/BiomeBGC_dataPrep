@@ -54,8 +54,8 @@ defineModule(sim, list(
     ),
     defineParameter("co2scenario", "character", "RCP45", NA, NA, 
                     paste("An representative concentration pathway for the co2",
-                    "concentration trajectories and meteorological data.",
-                    "Either 'RCP45' or 'RCP85'.")
+                          "concentration trajectories and meteorological data.",
+                          "Either 'RCP45' or 'RCP85'.")
     ),
     defineParameter("dailyOutput", "numeric", c(20, 21, 38, 40, 42, 43, 44, 70, 509, 528, 620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639, 579), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
@@ -63,6 +63,9 @@ defineModule(sim, list(
     ),
     defineParameter("maxSpinupYears", "integer", 6000L, NA, NA, 
                     paste("The maximum number of simulation for a spinup run.")
+    ),
+    defineParameter("metSpinupYears", "numeric", 40, NA, NA, 
+                    paste("The number of years used for the spinup.")
     ),
     defineParameter("NDepositionLevel", "numeric", c(1, NA, NA), NA, NA, 
                     paste("A 3-number vector:",
@@ -175,9 +178,9 @@ defineModule(sim, list(
                  sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
     ), 
     expectsInput("sppEquiv", "data.frame",
-                desc = paste(
-                  "A data frame to link the leading species map to ecophysiological constants.",
-                  "The columns are speciesId, species, genus, functional plant type.")
+                 desc = paste(
+                   "A data frame to link the leading species map to ecophysiological constants.",
+                   "The columns are speciesId, species, genus, functional plant type.")
     ), 
     expectsInput("studyArea", "SpatVector",
                  desc = paste("Polygons to use as the study area. Must be supplied by the user.",
@@ -265,10 +268,7 @@ prepareSpinupIni <- function(sim) {
     "_",
     P(sim)$climModel,
     P(sim)$co2scenario,
-    "_",
-    start(sim),
-    end(sim),
-    ".mtc43"
+    "_spinup.mtc43"
   ))
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
                            file.path("inputs", "metdata", fileName))
@@ -281,9 +281,8 @@ prepareSpinupIni <- function(sim) {
                            file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
   
   ## Set TIME_DEFINE section
-  nyear <- length(unique(sim$meteorologicalData$year))
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, end(sim) - start(sim)) # number of simulation years
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 1, P(sim)$metSpinupYears) # number of year in the metdata
+  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, P(sim)$metSpinupYears) # number of simulation years
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
@@ -374,6 +373,9 @@ prepareSpinupIni <- function(sim) {
   # extract the correct dominant species
   dominantSpecies <- extract(sim$dominantSpecies, sim$studyArea)[-1]
   dominantSpecies <- unique(names(dominantSpecies)[dominantSpecies==1])
+  if(length(dominantSpecies) == 0){
+    stop("Study area is not a forested treed-area.")
+  }
   dominantSpecies <- sim$sppEquiv$species[sim$sppEquiv$speciesId == dominantSpecies]
   # set filename
   fileName <- tolower(paste0(gsub(" ", "", dominantSpecies), ".epc"))
@@ -434,6 +436,22 @@ prepareIni <- function(sim) {
   # Start from the spinup ini
   bbgc.ini <- sim$bbgcSpinup.ini
   
+  ## Set MET_INPUT section
+  fileName <- tolower(paste0(
+    P(sim)$siteName,
+    "_",
+    P(sim)$climModel,
+    P(sim)$co2scenario,
+    "_",
+    start(sim),
+    end(sim),
+    ".mtc43"
+  ))
+  bbgc.ini <- iniSet(bbgc.ini,
+                     "MET_INPUT",
+                     1,
+                     file.path("inputs", "metdata", fileName))
+  
   # Change the RESTART section
   bbgc.ini <- iniSet(bbgc.ini, "RESTART", c(1:4), c(1, 0, 0, 0))
   bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
@@ -442,7 +460,7 @@ prepareIni <- function(sim) {
   # Change the TIME_DEFINE section
   nyear <- length(unique(sim$meteorologicalData$year))
   bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
-  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 2, end(sim) - start(sim)) # number of simulation years
+  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1) # number of simulation years
   bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
   bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
   
@@ -478,7 +496,6 @@ prepareIni <- function(sim) {
 .inputObjects <- function(sim) {
   dPath <- asPath(inputPath(sim), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
-  
   # Study area needs to be either points or a polygon
   if (!suppliedElsewhere('studyArea', sim)) {
     stop("studyArea must be provided.")
@@ -487,8 +504,13 @@ prepareIni <- function(sim) {
   # Dominant species layer
   # Default source: NTEMS dominant species layer for the 1st year of simulation
   if (!suppliedElsewhere('dominantSpecies', sim)) {
+    yearToUse <- max(min(start(sim), 2022), 1984)
+    if (yearToUse != start(sim)){
+      message("NTEMS dominant species layer is not available for ", start(sim), 
+              ", using layer for ", yearToUse)
+    }
     sim$dominantSpecies <- LandR::prepInputs_NTEMS_DominantSpecies(
-      year = start(sim),
+      year = yearToUse,
       destinationPath = dPath,
       cropTo = buffer(sim$studyArea, 1000),
       projectTo = crs(sim$studyArea),
@@ -592,7 +614,7 @@ prepareIni <- function(sim) {
       cropTo = buffer(sim$studyArea, 1000),
       projectTo = crs(sim$studyArea)
     ) |> Cache()
-
+    
     # We use the average for January of the first year.
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
     sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]]
@@ -621,6 +643,7 @@ prepareIni <- function(sim) {
       siteName = P(sim)$siteNames,
       firstYear = start(sim),
       lastYear = end(sim),
+      lastSpinupYear = start(sim) + P(sim)$metSpinupYears,
       scenario = P(sim)$co2scenario,
       climModel = P(sim)$climModel,
       destinationPath= dPath
