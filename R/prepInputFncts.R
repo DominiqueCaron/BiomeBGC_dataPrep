@@ -209,6 +209,8 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
     "fineRootLigninProportion",
     "litterLigninProportion",
     "level")
+  # If there are proportions for all but one component, infer the missing proportion (e.g.,prop3 = 1-(prop1+prop2))
+  white2010_2 <- fillMissingEPCProportions(white2010_2, pools = c("fineRoot", "litter"))
   white2010 <- merge(white2010_1, white2010_2, by = c("taxa", "level"), all = TRUE)
   
   # White 2010 table 3
@@ -219,14 +221,18 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
                             check.names = TRUE)
   white2010_3$Species[white2010_3$Species == "Pinus elliotii"] <- "Pinus elliottii"
   white2010_3$Species[white2010_3$Species == "Pinus Taeda"] <- "Pinus taeda"
-  white2010_3[white2010_3 == -999] <- NA
-  white2010_3[, c("Lignin", "Cellulose")] <- white2010_3[, c("Lignin", "Cellulose")]/100
+  white2010_3$Species[white2010_3$Species == "Robinea pseudoacacia"] <- "Robinia pseudoacacia"
+  white2010_3[white2010_3 == -999] <- NA # These are incorrect
+  # except for the lines with NAs, the column are mixed-up
+  white2010_3[!is.na(white2010_3$Cellulose), c("Lignin", "Cellulose")] <-  white2010_3[!is.na(white2010_3$Cellulose), c("Cellulose", "Lignin")]
+  white2010_3[, c("Lignin", "Cellulose")] <- white2010_3[, c("Lignin", "Cellulose")]/100 
   white2010_3 <- prepWhite2010Table(white2010_3, value.var = c("Lignin", "Cellulose"))
   names(white2010_3) <- c(
     "taxa",
     "deadWoodLigninProportion",
     "deadWoodCelluloseProportion",
     "level")
+  white2010_3 <- fillMissingEPCProportions(white2010_3, pools = "deadWood")
   white2010 <- merge(white2010, white2010_3, by = c("taxa", "level"), all = TRUE)
   
   # White 2010 table 4
@@ -245,12 +251,28 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
   )
   white2010 <- merge(white2010, white2010_4, by = c("taxa", "level"), all = TRUE)
   
+  # White 2010 table 5
+  white2010_5 <- prepInputs(targetFile = "White_spreadsheet5.csv", 
+                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
+                            destinationPath = destinationPath,
+                            fun = "data.table::fread",
+                            check.names = TRUE)
+  white2010_5[,c("Initial", "Final")] <- white2010_5[,c("Initial", "Final")] * 1000 # from kPa to Pa
+  white2010_5 <- prepWhite2010Table(white2010_5, value.var = c("Initial", "Final"))
+  names(white2010_5) <- c(
+    "taxa",
+    "initialVaporPressureDeficit",
+    "finalVaporPressureDeficit",
+    "level"
+  )
+  white2010 <- merge(white2010, white2010_5, by = c("taxa", "level"), all = TRUE)
+  
   epc <- rbindlist(list(epc, white2010), fill = TRUE)
   # check that the sums of proportions equal to 1
-  epc <- assertEPCproportions(epc)
+  epc <- scaleEPCProportions(epc)
   # Get the correct epc for the species in sppEquiv
   epc <- getEPC(epc, sppEquiv)
-  epc <- assertEPCproportions(epc)
+  epc <- cleanEPC(epc)
   # Write the species-level epcs in the destinationPath/epc folder
   apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   return(epc)

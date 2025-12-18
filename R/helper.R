@@ -149,59 +149,68 @@ epcWrite <- function(epc, fileName){
 sink()
 }
 
+# If there are proportions for all but one component, infer the missing proportion (e.g.,prop3 = 1-(prop1+prop2))
+fillMissingEPCProportions <- function(epc, pools = c("fineRoot", "litter", "deadWood")){
+  for (pool in pools){
+    # get the correct columns
+    cols <- grep(paste(pool, "Proportion", sep = ".*"), colnames(epc))
+    
+    # find the lines with 1 missing value
+    nonNAcols <- rowSums(!is.na(epc[,..cols]))
+    rowToFill <- which((length(cols) - nonNAcols) == 1)
+    
+    # fill the filling value with 1 - sum(other values)
+    epc[rowToFill, (cols) := {
+      x <- .SD
+      miss <- is.na(x)
+      x[miss] <- 1 - rowSums(x, na.rm = TRUE)
+      x
+    }, .SDcols = cols]
+  }
+  return(epc)
+}
+
+# If all fractions are available, make sure they sum to 1
+scaleEPCProportions <- function(epc, pools = c("fineRoot", "litter", "deadWood")){
+  for (pool in pools){
+    # get the correct columns
+    cols <- grep(paste(pool, "Proportion", sep = ".*"), colnames(epc))
+    
+    # find the lines that have all values and do not sum to 1
+    sumFractions <- rowSums(epc[,..cols])
+    rowToScale <- which(!is.na(sumFractions) & sumFractions != 1)
+    
+    # scale values
+    if(length(rowToScale) != 0){
+      epc[rowToScale, (cols) := {
+        x <- .SD
+        x <- x/rowSums(x)
+        x
+      }, .SDcols = cols]
+    }
+
+  }
+  return(epc)
+}
+
 # Makes sure that the sums of proportions in epc sum to 1
-assertEPCproportions <- function(epc){
-  # check Litter proportions
-  ## If there is only one missing, fill by subtracting the sum of the other two to 1
-  epc[, litterProportionN :=
-        rowSums(!is.na(.SD)),
-      .SDcols = c("litterLabileProportion",
-                  "litterCelluloseProportion",
-                  "litterLigninProportion")]
-  epc[litterProportionN == 2 & is.na(litterLabileProportion), litterLabileProportion := 1 - (litterCelluloseProportion + litterLigninProportion)]
-  epc[litterProportionN == 2 & is.na(litterCelluloseProportion), litterCelluloseProportion := 1 - (litterLabileProportion + litterLigninProportion)]
-  epc[litterProportionN == 2 & is.na(litterLigninProportion), litterLigninProportion := 1 - (litterCelluloseProportion + litterLabileProportion)]
-  ## If the three are provided, make sure that they sum to 1 (scale if necessary)
-  epc[, litterProportionSum := litterLabileProportion + litterCelluloseProportion + litterLigninProportion]
-  epc[litterProportionN == 3 & litterProportionSum != 1, litterLabileProportion := litterLabileProportion / litterProportionSum]
-  epc[litterProportionN == 3 & litterCelluloseProportion != 1, litterCelluloseProportion := litterCelluloseProportion / litterProportionSum]
-  epc[litterProportionN == 3 & litterLigninProportion != 1, litterLigninProportion := litterLigninProportion / litterProportionSum]
-  epc[ , litterProportionN := NULL]
-  epc[ , litterProportionSum := NULL]
+cleanEPC <- function(epc){
+  # scale proportions to 1
+  epc <- scaleEPCProportions(epc)
+  # round constants
+  epc[, "leafAndFineRootTurnover"] <- round(epc[, "leafAndFineRootTurnover"], 3)
+  allocationCols <- grep("new", names(epc))
+  epc[, ..allocationCols] <- round(epc[, ..allocationCols], 2)
+  CtoNCols <- grep("CtoN", names(epc))
+  epc[, ..CtoNCols] <- round(epc[, ..CtoNCols], 2)
+  proportionCols <- grep("Proportion", names(epc))[-1]
+  epc[, proportionCols] <- round(epc[, ..proportionCols], 2)
+  epc[, c(32:39)] <- round(epc[, c(32:39)], 3)
   
-  # do the same with fine root proportions
-  ## If there is only one missing, fill by subtracting the sum of the other two to 1
-  epc[, FRProportionN :=
-        rowSums(!is.na(.SD)),
-      .SDcols = c("fineRootLabileProportion",
-                  "fineRootCelluloseProportion",
-                  "fineRootLigninProportion")]
-  epc[FRProportionN == 2 & is.na(fineRootLabileProportion), fineRootLabileProportion := 1 - (fineRootCelluloseProportion + fineRootLigninProportion)]
-  epc[FRProportionN == 2 & is.na(fineRootCelluloseProportion), fineRootCelluloseProportion := 1 - (fineRootLabileProportion + fineRootLigninProportion)]
-  epc[FRProportionN == 2 & is.na(fineRootLigninProportion), fineRootLigninProportion := 1 - (fineRootCelluloseProportion + fineRootLabileProportion)]
-  ## If the three are provided, make sure that they sum to 1 (scale if necessary)
-  epc[, FRProportionSum := fineRootLabileProportion + fineRootCelluloseProportion + fineRootLigninProportion]
-  epc[FRProportionN == 3 & FRProportionSum != 1, fineRootLabileProportion := fineRootLabileProportion / FRProportionSum]
-  epc[FRProportionN == 3 & FRProportionSum != 1, fineRootCelluloseProportion := fineRootCelluloseProportion / FRProportionSum]
-  epc[FRProportionN == 3 & FRProportionSum != 1, fineRootLigninProportion := fineRootLigninProportion / FRProportionSum]
-  epc[ , FRProportionN := NULL]
-  epc[ , FRProportionSum := NULL]
-  
-  # and finally with dead wood
-  ## If there is only one missing, fill by subtracting the sum of the other two to 1
-  epc[, DWProportionN :=
-        rowSums(!is.na(.SD)),
-      .SDcols = c("deadWoodCelluloseProportion",
-                  "deadWoodLigninProportion")]
-  epc[DWProportionN == 1 & is.na(deadWoodCelluloseProportion), deadWoodCelluloseProportion := 1 - deadWoodLigninProportion]
-  epc[DWProportionN == 1 & is.na(deadWoodLigninProportion), deadWoodLigninProportion := 1 - deadWoodCelluloseProportion]
-  ## If the three are provided, make sure that they sum to 1 (scale if necessary)
-  epc[, DWProportionSum := deadWoodCelluloseProportion + deadWoodLigninProportion]
-  epc[DWProportionN == 2 & DWProportionSum != 1, deadWoodCelluloseProportion := deadWoodCelluloseProportion / DWProportionSum]
-  epc[DWProportionN == 2 & DWProportionSum != 1, deadWoodLigninProportion := deadWoodLigninProportion / DWProportionSum]
-  epc[ , DWProportionN := NULL]
-  epc[ , DWProportionSum := NULL]
-  
+  # After rounding, make sure proportions equal to 1
+  epc[, litterLigninProportion := 1-(litterLabileProportion+litterCelluloseProportion)]
+  epc[, fineRootLigninProportion  := 1-(fineRootCelluloseProportion +fineRootLabileProportion)]
+  epc[, deadWoodLigninProportion := 1-deadWoodCelluloseProportion]
   return(epc)
 }
 
@@ -252,7 +261,7 @@ initiateEPC <- function() {
       boundaryLayerConductance = numeric(),
       initialLeafWaterPotential = numeric(),
       finalLeafWaterPotential = numeric(),
-      initialVaportPressureDeficit = numeric(),
+      initialVaporPressureDeficit = numeric(),
       finalVaporPressureDeficit = numeric()
     )
   )
