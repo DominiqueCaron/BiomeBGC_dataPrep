@@ -146,7 +146,7 @@ epcWrite <- function(epc, fileName){
     cat(epcDescription)
   }
   cat("\n")
-sink()
+  sink()
 }
 
 # If there are proportions for all but one component, infer the missing proportion (e.g.,prop3 = 1-(prop1+prop2))
@@ -188,7 +188,7 @@ scaleEPCProportions <- function(epc, pools = c("fineRoot", "litter", "deadWood")
         x
       }, .SDcols = cols]
     }
-
+    
   }
   return(epc)
 }
@@ -200,9 +200,9 @@ cleanEPC <- function(epc){
   # round constants
   epc[, "leafAndFineRootTurnover"] <- round(epc[, "leafAndFineRootTurnover"], 3)
   allocationCols <- grep("new", names(epc))
-  epc[, ..allocationCols] <- round(epc[, ..allocationCols], 2)
+  epc[, allocationCols] <- round(epc[, ..allocationCols], 2)
   CtoNCols <- grep("CtoN", names(epc))
-  epc[, ..CtoNCols] <- round(epc[, ..CtoNCols], 2)
+  epc[, CtoNCols] <- round(epc[, ..CtoNCols], 2)
   proportionCols <- grep("Proportion", names(epc))[-1]
   epc[, proportionCols] <- round(epc[, ..proportionCols], 2)
   epc[, c(32:39)] <- round(epc[, c(32:39)], 3)
@@ -409,4 +409,23 @@ lccToAlbedo <- function(lcc, albedoTable, studyArea){
   albedo[lcc == 6] <- albedoTable[1, colId]
   albedo[lcc == 7] <- albedoTable[4, colId]
   return(round(albedo, digits = 2))
+}
+
+#### Biome-BGC output helper functions ####
+getOutputDescription <- function(outputId){
+  # get the output and their id from github
+  url <- "https://raw.githubusercontent.com/bpbond/Biome-BGC/refs/heads/master/src/bgclib/output_map_init.c"
+  txt <- readLines(url)
+  
+  # extract the relevant lines
+  name_lines <- txt[grepl("output_map\\[[0-9]", txt)]
+  
+  outputTbl <- data.table(
+    output_id = as.integer(sub(".*\\[([^]]+)\\].*", "\\1", name_lines)),
+    output_name = sub(".*&([^->]+)->([^;]+);.*", "\\1.\\2", name_lines)
+  )
+  
+  out <- outputTbl[output_id %in% outputId]$output_name
+  
+  return(out)
 }

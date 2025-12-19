@@ -340,7 +340,7 @@ prepareSpinupIni <- function(sim) {
   
   # wet+dry atmospheric deposition of N
   if (is.na(P(sim)$siteConstants[8])) {
-    Ndeposition <- extract(sim$Ndeposition[[1]], sim$studyArea)[,2] |> round(digits = 4)
+    Ndeposition <- extract(sim$Ndeposition[[1]], sim$studyArea)[,2] |> round(digits = 5)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, format(Ndeposition, scientific = FALSE, trim = TRUE))
   } else {
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, P(sim)$siteConstants[8])
@@ -362,7 +362,7 @@ prepareSpinupIni <- function(sim) {
   bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1, 0)
   if(P(sim)$NDeposition[1] == 1 & is.na(P(sim)$NDeposition[2])){
     year2 <- names(sim$Ndeposition[[2]])
-    Ndeposition2 <- extract(sim$Ndeposition[[2]], sim$studyArea)[,2] |> round(digits = 4)
+    Ndeposition2 <- extract(sim$Ndeposition[[2]], sim$studyArea)[,2] |> round(digits = 5)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 2, year2)
     bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 3, format(Ndeposition2, scientific = FALSE, trim = TRUE))
   } else if (P(sim)$NDeposition[1] == 1 & !is.na(P(sim)$NDeposition[2])){
@@ -410,21 +410,28 @@ prepareSpinupIni <- function(sim) {
                              1)) # for on-screen progress indicator
   
   # Set DAILY_OUTPUT section
-  # TODO Get the comments right
   nDailyOutput <- length(P(sim)$dailyOutput)
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
-                           "DAILY_OUTPUT",
-                           1:(nDailyOutput + 1),
-                           c(nDailyOutput, P(sim)$dailyOutput))
-  bbgcSpinup.ini$DAILY_OUTPUT <- bbgcSpinup.ini$DAILY_OUTPUT[c(1:(2+nDailyOutput)),]
+  # Rewrite, it is easier given that the size of the section varies
+  bbgcSpinup.ini[["DAILY_OUTPUT"]] <- rbind(bbgcSpinup.ini[["DAILY_OUTPUT"]][1, ],
+                                            c(nDailyOutput, "(int)", "number of daily variables to output"))
+  bbgcSpinup.ini[["DAILY_OUTPUT"]] <- rbind(bbgcSpinup.ini[["DAILY_OUTPUT"]],
+                                            data.frame(
+                                              value = P(sim)$dailyOutput,
+                                              unit = c(0:(nDailyOutput-1)),
+                                              comment = getOutputDescription(P(sim)$dailyOutput)
+                                            ))
   
   # Set ANNUAL_OUTPUT section
   nAnnOutput <- length(P(sim)$annualOutput)
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
-                           "ANNUAL_OUTPUT",
-                           1:(nAnnOutput + 1),
-                           c(nAnnOutput, P(sim)$annualOutput))
-  bbgcSpinup.ini$ANNUAL_OUTPUT <- bbgcSpinup.ini$ANNUAL_OUTPUT[c(1:(2+nAnnOutput)),]
+  # Rewrite, it is easier given that the size of the section varies
+  bbgcSpinup.ini[["ANNUAL_OUTPUT"]] <- rbind(bbgcSpinup.ini[["ANNUAL_OUTPUT"]][1, ],
+                                             c(nAnnOutput, "(int)", "number of annual output variables"))
+  bbgcSpinup.ini[["ANNUAL_OUTPUT"]] <- rbind(bbgcSpinup.ini[["ANNUAL_OUTPUT"]],
+                                             data.frame(
+                                               value = P(sim)$annualOutput,
+                                               unit = c(0:(nAnnOutput-1)),
+                                               comment = getOutputDescription(P(sim)$annualOutput)
+                                             ))
   
   # add to simList
   sim$bbgcSpinup.ini <- bbgcSpinup.ini
