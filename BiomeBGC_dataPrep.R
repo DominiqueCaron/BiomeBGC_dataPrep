@@ -164,6 +164,16 @@ defineModule(sim, list(
                  ),
                  sourceURL = "https://www.sciencebase.gov/catalog/item/66a97480d34e07a119db3a37"
     ), 
+    expectsInput("pixelGroupMap", "SpatRaster", 
+                 desc = paste("")
+    ),
+    expectsInput("pixelGroupParameters", "data.frame", 
+                 desc = paste("")
+    ),
+    expectsInput("rasterToMatch", "SpatRaster", 
+                 desc = paste("A raster defining the extent, resolution, projection of the",
+                              "study area.")
+    ),
     expectsInput("snowpackWaterContent", "SpatRaster",
                  desc = paste(
                    "Initial snowpack water content (kg/m2)."
@@ -519,8 +529,7 @@ prepareIni <- function(sim) {
     sim$dominantSpecies <- LandR::prepInputs_NTEMS_DominantSpecies(
       year = yearToUse,
       destinationPath = dPath,
-      cropTo = buffer(sim$studyArea, 1000),
-      projectTo = crs(sim$studyArea),
+      to = sim$rasterToMatch,
     ) |> Cache()
   }
   
@@ -558,18 +567,21 @@ prepareIni <- function(sim) {
   if (!suppliedElsewhere('soilTexture', sim)) {
     sim$soilTexture <- prepSoilTexture(
       destinationPath = dPath,
-      studyArea = sim$studyArea
+      to = sim$rasterToMatch
     ) |> Cache()
   }
   
   # Elevation raster
   # Default source: Amazon Web Services Terrain Tiles
   if (!suppliedElsewhere('elevation', sim)) {
-    sim$elevation <-  get_elev_raster(
+    elevation <-  get_elev_raster(
       locations = sf::st_as_sf(sim$studyArea),
       z = 10
     ) |> Cache()
-    sim$elevation <- rast(sim$elevation)
+    sim$elevation <- postProcessTo(
+      rast(elevation),
+      to = sim$rasterToMatch
+    ) |> Cache()
   }
   
   # Total N deposition
@@ -579,7 +591,7 @@ prepareIni <- function(sim) {
     year2 <- min(end(sim), 2020)
     sim$Ndeposition <-  prepNdeposition(
       destinationPath = dPath,
-      studyArea = sim$studyArea,
+      to = sim$rasterToMatch,
       year1 = year1,
       year2 = year2
     ) |> Cache()
@@ -593,8 +605,7 @@ prepareIni <- function(sim) {
       overwrite = TRUE,
       url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
       destinationPath = dPath,
-      cropTo = buffer(sim$studyArea, 1000),
-      projectTo = crs(sim$studyArea),
+      to = sim$rasterToMatch,
       fun = "terra::rast"
     ) |> Cache()
     sim$NfixationRates <- sim$NfixationRates/10000 # convert from kg/ha/yr to kg/m2/yr
@@ -618,8 +629,7 @@ prepareIni <- function(sim) {
       url = "https://climate-scenarios.canada.ca/files/blended_snow_2024/swe_monthly_mm_1981-2020.zip",
       fun = "terra::rast",
       destinationPath = dPath,
-      cropTo = buffer(sim$studyArea, 1000),
-      projectTo = crs(sim$studyArea)
+      to = sim$rasterToMatch,
     ) |> Cache()
     
     # We use the average for January of the first year.
@@ -632,10 +642,11 @@ prepareIni <- function(sim) {
   # Default source: Based on SCANFI landcover and albedo of land cover type in 
   # Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
   if (!suppliedElsewhere('shortwaveAlbedo', sim)) {
-    lcc <- prepInputs(url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
-                      destinationPath= dPath,
-                      cropTo = buffer(sim$studyArea, 30),
-                      projectTo = crs(sim$studyArea)) |> Cache()
+    lcc <- prepInputs(
+      url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
+      destinationPath = dPath,
+      to = sim$rasterToMatch
+    ) |> Cache()
     lcc <- extract(lcc, sim$studyArea)
     albedoTable <- rvestAlbedoTable()
     sim$shortwaveAlbedo <- lccToAlbedo(lcc[,2], albedoTable, sim$studyArea)

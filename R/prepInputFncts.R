@@ -8,20 +8,18 @@
 # prepClimate
 
 # Extract % of sand, % of clay and % of silt from CanSIS dataset
-prepSoilTexture <- function(destinationPath, studyArea){
+prepSoilTexture <- function(destinationPath, to){
   sand <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 100),
-    projectTo = crs(studyArea)
+    to = to
   )
   clay <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 100),
-    projectTo = crs(studyArea)
+    to = to
   )
   silt <- 100 - (sand + clay)
   soilTexture <- c(sand, silt, clay)
@@ -37,8 +35,7 @@ prepNdeposition <- function(destinationPath, studyArea, year1, year2){
     overwrite = TRUE,
     url = "https://springernature.figshare.com/ndownloader/files/48644623",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 1000),
-    projectTo = crs(studyArea),
+    to = to,
     fun = "terra::rast"
   )
   Ndeposition2 <- prepInputs(
@@ -47,8 +44,7 @@ prepNdeposition <- function(destinationPath, studyArea, year1, year2){
     overwrite = TRUE,
     url = "https://springernature.figshare.com/ndownloader/files/48644623",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 1000),
-    projectTo = crs(studyArea),
+    to = to,
     fun = "terra::rast"
   )
   Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
