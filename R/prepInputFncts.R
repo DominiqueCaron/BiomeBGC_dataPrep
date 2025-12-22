@@ -28,7 +28,7 @@ prepSoilTexture <- function(destinationPath, to){
 }
 
 # Extract N-deposition data for 2 years.
-prepNdeposition <- function(destinationPath, studyArea, year1, year2){
+prepNdeposition <- function(destinationPath, to, year1, year2){
   Ndeposition1 <- prepInputs(
     targetFile = paste0("mean_totN_", year1, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
@@ -275,12 +275,12 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
 }
 
 # Extract the meteorological data
-prepClimate <- function(studyArea, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
+prepClimate <- function(rasterToMatch, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude
-  latlon <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84")), 2)
+  latlon <- round(crds(project(rasterToMatch, "+proj=longlat +ellps=WGS84 +datum=WGS84")), 2)
   lon <- latlon[1]
   lat <- latlon[2]
   
