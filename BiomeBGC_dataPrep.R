@@ -120,6 +120,10 @@ defineModule(sim, list(
                     "Should caching of events or module be used?")
   ),
   inputObjects = bindrows(
+    expectsInput("climatePolygons", "SpatVector", 
+                 desc = paste("Polygons of homogeneous climate. By default,",
+                              "ecodistricts are used.")
+    ),
     expectsInput("CO2concentration", "data.frame", 
                  desc = paste("CO2 concentration for each year.")
     ),
@@ -144,7 +148,7 @@ defineModule(sim, list(
     ),
     expectsInput("meteorologicalData", "list", 
                  desc = paste("List of data.frames with the meteorological data",
-                              "for each study site. The units are `deg C`",
+                              "for each climate polygons. The units are `deg C`",
                               "for Tmax, Tmin, and Tday, `cm` for prcp, `Pa` for",
                               "VPD, `W/m^2` for srad, and `s` for daylen.")
     ),
@@ -518,6 +522,20 @@ prepareIni <- function(sim) {
     stop("studyArea must be provided.")
   }
   
+  # Climate polygons: Climate is assumed to be homogeneous within polygons
+  # Default source: Canadian ecodistrict
+  if (!suppliedElsewhere('climatePolygons', sim)) {
+    
+    sim$climatePolygons <- prepInputs(
+      targetFile = "ecodistricts.shp",
+      url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/district/ecodistrict_shp.zip",
+      destinationPath = dPath,
+      to = sim$rasterToMatch,
+      fun = "terra::vect"
+    ) |> Cache()
+    
+  }
+  
   # Dominant species layer
   # Default source: NTEMS dominant species layer for the 1st year of simulation
   if (!suppliedElsewhere('dominantSpecies', sim)) {
@@ -526,10 +544,12 @@ prepareIni <- function(sim) {
       message("NTEMS dominant species layer is not available for ", start(sim), 
               ", using layer for ", yearToUse)
     }
-    sim$dominantSpecies <- LandR::prepInputs_NTEMS_DominantSpecies(
+    sim$dominantSpecies <- prepNTEMSDominantSpecies(
       year = yearToUse,
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      cropTo = sim$rasterToMatch,
+      projectTo = sim$rasterToMatch,
+      maskTo = sim$studyArea
     ) |> Cache()
   }
   
@@ -545,8 +565,9 @@ prepareIni <- function(sim) {
       genus = sppEquiv$genus,
       PFT = sppEquiv$PFT
     )
-    sppEquiv <- sppEquiv[sppEquiv$speciesId %in% names(sim$dominantSpecies),]
-    sim$sppEquiv <- sppEquiv[!duplicated(sppEquiv$speciesId),]
+    speciesIdInStudyArea <- unique(values(sim$dominantSpecies)) |> na.omit()
+    speciesInStudyArea <- cats(sim$dominantSpecies)[[1]][speciesIdInStudyArea,"category"]
+    sim$sppEquiv <- sppEquiv[match(speciesInStudyArea, sppEquiv$speciesId),]
   }
   
   # Table of ecophysiological constants of each species Id
@@ -578,10 +599,11 @@ prepareIni <- function(sim) {
       locations = sf::st_as_sf(sim$studyArea),
       z = 10
     ) |> Cache()
-    sim$elevation <- postProcessTo(
+    elevation <- postProcessTo(
       rast(elevation),
       to = sim$rasterToMatch
     ) |> Cache()
+    sim$elevation <- signif(elevation, 3)
   }
   
   # Total N deposition
@@ -608,9 +630,9 @@ prepareIni <- function(sim) {
       to = sim$rasterToMatch,
       fun = "terra::rast"
     ) |> Cache()
-    sim$NfixationRates <- sim$NfixationRates/10000 # convert from kg/ha/yr to kg/m2/yr
+    sim$NfixationRates <- round(sim$NfixationRates, digits = 1)/10000 # convert from kg/ha/yr to kg/m2/yr
   }
-  
+
   # Initial snowpack water content
   # Default source: ECC snow water equivalent (SWE) over the Northern Hemisphere
   # Methods: Mudryk et al., 2015: https://doi.org/10.1175/JCLI-D-15-0229.1
@@ -634,7 +656,7 @@ prepareIni <- function(sim) {
     
     # We use the average for January of the first year.
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
-    sim$snowpackWaterContent <- sim$snowpackWaterContent[[layerToKeep]]
+    sim$snowpackWaterContent <- round(sim$snowpackWaterContent[[layerToKeep]], 0)
     terra::units(sim$snowpackWaterContent) <- "kg/m^2"
   }
   
@@ -645,11 +667,11 @@ prepareIni <- function(sim) {
     lcc <- prepInputs(
       url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
       destinationPath = dPath,
-      to = sim$rasterToMatch
+      to = sim$rasterToMatch,
+      method = "near"
     ) |> Cache()
-    lcc <- extract(lcc, sim$studyArea)
     albedoTable <- rvestAlbedoTable()
-    sim$shortwaveAlbedo <- lccToAlbedo(lcc[,2], albedoTable, sim$studyArea)
+    sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, sim$rasterToMatch)
   }
   
   # Meteorological data

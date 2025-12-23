@@ -1,4 +1,5 @@
 ## Functions used to in the .inputObjects event:
+# prepNTEMSDominantSpecies
 # prepSoilTexture
 # prepNdeposition
 # rvestAlbedoTable
@@ -7,6 +8,32 @@
 # prepWhite2010EPC
 # prepClimate
 
+# Extract dominant species from NTEMS layers
+prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, maskTo, method = "mode"){
+  # prepare url and targetFile for prepInput call
+  domSppURL <- paste0("https://opendata.nfis.org/downloads/forest_change/CA_Tree_Species_Classification_", year, ".zip")
+  domSppTF <- paste0("CA_Forest_Tree_Species_", year, ".tif")  
+
+  # prepInput
+  dominantSpecies <- prepInputs(
+    targetFile = domSppTF,
+    url = domSppURL,
+    cropTo = cropTo,
+    projectTo = projectTo,,
+    maskTo = maskTo,
+    method = method
+  )
+  # set 0 to NA
+  NAflag(dominantSpecies) <- 0
+  
+  # Transform NTEMS code to speciesCode
+  cls <- unique(LandR::sppEquivalencies_CA[, c("NTEMS_Species_Code", "LandR")]) |> na.omit()
+  names(cls) <- c("id", "category")
+  levels(dominantSpecies) <- cls
+  
+  return(dominantSpecies)
+}
+
 # Extract % of sand, % of clay and % of silt from CanSIS dataset
 prepSoilTexture <- function(destinationPath, to){
   sand <- prepInputs(
@@ -14,13 +41,13 @@ prepSoilTexture <- function(destinationPath, to){
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  )
+  ) |> round()
   clay <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  )
+  ) |> round()
   silt <- 100 - (sand + clay)
   soilTexture <- c(sand, silt, clay)
   names(soilTexture) <- c("sand", "silt", "clay")
@@ -37,7 +64,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     destinationPath = destinationPath,
     to = to,
     fun = "terra::rast"
-  )
+  ) |> round(digits = 1)
   Ndeposition2 <- prepInputs(
     targetFile = paste0("mean_totN_", year2, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
@@ -46,9 +73,10 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     destinationPath = destinationPath,
     to = to,
     fun = "terra::rast"
-  )
+  ) |> round(digits = 1)
   Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
   names(Ndeposition) <- as.character(c(year1, year2))
+  
   return(Ndeposition)
 }
 
