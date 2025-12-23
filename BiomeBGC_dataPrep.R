@@ -679,7 +679,7 @@ prepareIni <- function(sim) {
   if (!suppliedElsewhere('meteorologicalData', sim)) {
     
     sim$meteorologicalData <- prepClimate(
-      rasterToMatch = sim$rasterToMatch,
+      climatePolygons = sim$climatePolygons,
       siteName = P(sim)$siteNames,
       firstYear = start(sim),
       lastYear = end(sim),

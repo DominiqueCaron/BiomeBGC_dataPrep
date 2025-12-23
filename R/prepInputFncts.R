@@ -13,13 +13,14 @@ prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, m
   # prepare url and targetFile for prepInput call
   domSppURL <- paste0("https://opendata.nfis.org/downloads/forest_change/CA_Tree_Species_Classification_", year, ".zip")
   domSppTF <- paste0("CA_Forest_Tree_Species_", year, ".tif")  
-
+  
   # prepInput
   dominantSpecies <- prepInputs(
     targetFile = domSppTF,
     url = domSppURL,
+    destinationPath = destinationPath,
     cropTo = cropTo,
-    projectTo = projectTo,,
+    projectTo = projectTo,
     maskTo = maskTo,
     method = method
   )
@@ -303,21 +304,27 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
 }
 
 # Extract the meteorological data
-prepClimate <- function(rasterToMatch, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
+prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude
-  latlon <- round(crds(project(rasterToMatch, "+proj=longlat +ellps=WGS84 +datum=WGS84")), 2)
-  lon <- latlon[1]
-  lat <- latlon[2]
+  latlon <- project(crds(centroids(climatePolygons)), crs(climatePolygons), "EPSG:4326")
+  lon <- latlon[,1]
+  lat <- latlon[,2]
+  
+  if ("ECODISTRIC" %in% names(climatePolygons)){
+    id = climatePolygons$ECODISTRIC
+  } else {
+    id = c(1:length(climatePolygons))
+  }
   
   # get climate from BioSim
   climate <- generateWeather(
     modelNames = c("Climatic_Daily", "VaporPressureDeficit_Daily"),
     fromYr = firstYear,
     toYr = lastYear,
-    id = siteName,
+    id = id,
     latDeg = lat,
     longDeg = lon,
     rcp = scenario,
@@ -325,67 +332,69 @@ prepClimate <- function(rasterToMatch, siteName, firstYear, lastYear, lastSpinup
     additionalParms = NULL
   )
   
-  # remove 1 day from leap years (February 29)
-  climate <- lapply(climate, FUN = function(x){
-    x <- x[x$Month != 2 | x$Day != 29,]
-  })
+  # format climate data, 1 ecodistrict at a time
+  climOut <- list()
+  for (i in id) {
+    climate_i <- lapply(climate, FUN = function(x){
+      x <- x[x$KeyID == i, ]
+      x <- x[x$Month != 2 | x$Day != 29,]
+      x
+    })
+    
+    daylen <- daylength(lat[id == i], 1:365) * 60 * 60
+    
+    climate_i <- data.frame(
+      year = climate_i[["Climatic_Daily"]]$Year,
+      yday = 1:365,
+      tmax = climate_i[["Climatic_Daily"]]$Tmax,
+      tmin = climate_i[["Climatic_Daily"]]$Tmin,
+      tday = climate_i[["Climatic_Daily"]]$Tair,
+      prcp = climate_i[["Climatic_Daily"]]$Prcp/10, # from mm to cm
+      vpd = climate_i[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
+      srad = climate_i[["Climatic_Daily"]]$SRad,
+      daylen = daylen,
+      spinup = climate_i[["Climatic_Daily"]]$Year <= lastSpinupYear
+    )
+    
+    spinupFileName <- tolower(paste0(
+      i,
+      "_",
+      climModel,
+      scenario,
+      "_spinup.mtc43"
+    ))
+    spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
+    
+    metWrite(
+      metData = climate_i[climate_i$spinup, c(1:10)],
+      fileName = spinupFileName,
+      siteName  = paste0("Climate Polygon: ", i),
+      dataSource = paste(climModel, scenario, sep = ": ")
+    )
+    
+    # Met data for main simulation
+    fileName <- tolower(paste0(
+      i,
+      "_",
+      climModel,
+      scenario,
+      "_",
+      firstYear,
+      lastYear,
+      ".mtc43"
+    ))
+    fileName <- file.path(destinationPath, "metdata", fileName)
+    
+    metWrite(
+      metData = climate_i[, c(1:10)],
+      fileName = fileName,
+      siteName  = paste0("Climate Polygon: ", i),
+      dataSource = paste(climModel, scenario, sep = ": ")
+    )
+    
+    
+    climOut[[as.character(i)]] <- climate_i
+  }
   
-  # get day length in second
-  daylen <- daylength(lat, 1:365) * 60 * 60
-  
-  
-  # format climate data
-  climate <- data.frame(
-    year = climate[["Climatic_Daily"]]$Year,
-    yday = 1:365,
-    tmax = climate[["Climatic_Daily"]]$Tmax,
-    tmin = climate[["Climatic_Daily"]]$Tmin,
-    tday = climate[["Climatic_Daily"]]$Tair,
-    prcp = climate[["Climatic_Daily"]]$Prcp/10, # from mm to cm
-    vpd = climate[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
-    srad = climate[["Climatic_Daily"]]$SRad,
-    daylen = daylen,
-    spinup = climate[["Climatic_Daily"]]$Year <= lastSpinupYear
-  )
-  
-  # write to inputs
-  
-  # Met data for spinup
-  spinupFileName <- tolower(paste0(
-    siteName,
-    "_",
-    climModel,
-    scenario,
-    "_spinup.mtc43"
-  ))
-  spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
-  
-  metWrite(
-    metData = climate[climate$spinup, c(1:10)],
-    fileName = spinupFileName,
-    siteName  = siteName,
-    dataSource = paste(climModel, scenario, sep = ": ")
-  )
-  
-  # Met data for main simulation
-  fileName <- tolower(paste0(
-    siteName,
-    "_",
-    climModel,
-    scenario,
-    "_",
-    firstYear,
-    lastYear,
-    ".mtc43"
-  ))
-  fileName <- file.path(destinationPath, "metdata", fileName)
-  
-  metWrite(
-    metData = climate[, c(1:10)],
-    fileName = fileName,
-    siteName  = siteName,
-    dataSource = paste(climModel, scenario, sep = ": ")
-  )
-  
-  return(climate)
+  return(climOut)
 }

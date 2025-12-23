@@ -391,7 +391,6 @@ CO2write <- function(co2Data, fileName){
 lccToAlbedo <- function(lcc, albedoTable, rasterToMatch){
   LCCval <- values(lcc)
 
-  browser()
   latitudes <- project(crds(rasterToMatch, na.rm = FALSE), crs(rasterToMatch), "EPSG:4326")[,2]
   
   colIds <- ifelse(latitudes > 60, 3, ifelse(latitudes > 50, 4, ifelse(latitude > 40, 5, 6)))
