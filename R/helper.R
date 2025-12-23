@@ -390,7 +390,6 @@ CO2write <- function(co2Data, fileName){
 # 8 = Water
 lccToAlbedo <- function(lcc, albedoTable, rasterToMatch){
   LCCval <- values(lcc)
-
   latitudes <- project(crds(rasterToMatch, na.rm = FALSE), crs(rasterToMatch), "EPSG:4326")[,2]
   
   colIds <- ifelse(latitudes > 60, 3, ifelse(latitudes > 50, 4, ifelse(latitude > 40, 5, 6)))
@@ -398,11 +397,11 @@ lccToAlbedo <- function(lcc, albedoTable, rasterToMatch){
     LCCval == 5, 3, ifelse(LCCval == 6, 1, ifelse(LCCval == 7, 4, NA))
   ))) |> as.vector()
   
-
+  
   albedo <- albedoTable[cbind(rowIds, colIds)]
   
   out <- lcc
-  values(out) <- albedo
+  values(out) <- round(as.numeric(albedo), digits = 2)
   
   return(round(out, digits = 2))
 }

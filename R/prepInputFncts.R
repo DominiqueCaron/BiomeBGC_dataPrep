@@ -65,7 +65,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     destinationPath = destinationPath,
     to = to,
     fun = "terra::rast"
-  ) |> round(digits = 1)
+  ) |> round()
   Ndeposition2 <- prepInputs(
     targetFile = paste0("mean_totN_", year2, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
@@ -74,7 +74,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     destinationPath = destinationPath,
     to = to,
     fun = "terra::rast"
-  ) |> round(digits = 1)
+  ) |> round()
   Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
   names(Ndeposition) <- as.character(c(year1, year2))
   

@@ -630,9 +630,9 @@ prepareIni <- function(sim) {
       to = sim$rasterToMatch,
       fun = "terra::rast"
     ) |> Cache()
-    sim$NfixationRates <- round(sim$NfixationRates, digits = 1)/10000 # convert from kg/ha/yr to kg/m2/yr
+    sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }
-
+  
   # Initial snowpack water content
   # Default source: ECC snow water equivalent (SWE) over the Northern Hemisphere
   # Methods: Mudryk et al., 2015: https://doi.org/10.1175/JCLI-D-15-0229.1
@@ -701,6 +701,52 @@ prepareIni <- function(sim) {
       scenario = P(sim)$co2scenario,
       destinationPath= dPath
     ) |> Cache()
+    
+  }
+  
+  # pixelGroups
+  if (!suppliedElsewhere('pixelGroupParameters', sim)) {
+    if("ECODISTRIC" %in% names(sim$climatePolygons)){
+      field <- "ECODISTRIC"
+    } else {
+      field <- ""
+    }
+    sim$pixelGroupParameters <- data.table(
+      pixelIndex = 1:ncell(sim$rasterToMatch),
+      climatePolygon = values(rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)),
+      dominantSpecies = values(sim$dominantSpecies) |> as.vector(),
+      soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
+      soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
+      soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
+      soilAlbedo = values(sim$soilTexture$silt) |> as.vector(),
+      NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
+      NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
+      NfixationRate = values(sim$NfixationRates) |> as.vector(),
+      elevation = values(sim$elevation) |> as.vector(),
+      snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
+    ) 
+    
+    cols <- setdiff(names(sim$pixelGroupParameters), "pixelIndex")
+    
+    sim$pixelGroupParameters[, "pixelGroup"] <- LandR::generatePixelGroups(
+      sim$pixelGroupParameters,
+      maxPixelGroup = 0,
+      columns = cols
+    )
+    sim$pixelGroupParameters
+    
+    sim$pixelGroupMap <- copy(sim$rasterToMatch)
+    values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
+    values(sim$pixelGroupMap)[is.na(sim$pixelGroupParameters$dominantSpecies)] <- NA
+    
+    cols <- c(cols, "pixelGroup")
+    sim$pixelGroupParameters <- unique(
+      sim$pixelGroupParameters[,  ..cols],
+      by = "pixelGroup"
+    ) |> na.omit()
+    
+    setkey(sim$pixelGroupParameters, pixelGroup)
+    setcolorder(sim$pixelGroupParameters, "pixelGroup")
     
   }
   
