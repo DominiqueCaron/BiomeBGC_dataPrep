@@ -168,12 +168,6 @@ defineModule(sim, list(
                  ),
                  sourceURL = "https://www.sciencebase.gov/catalog/item/66a97480d34e07a119db3a37"
     ), 
-    expectsInput("pixelGroupMap", "SpatRaster", 
-                 desc = paste("")
-    ),
-    expectsInput("pixelGroupParameters", "data.frame", 
-                 desc = paste("")
-    ),
     expectsInput("rasterToMatch", "SpatRaster", 
                  desc = paste("A raster defining the extent, resolution, projection of the",
                               "study area.")
@@ -202,10 +196,24 @@ defineModule(sim, list(
     )
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "bbgcSpinup.ini", objectClass = "character", desc = paste("Biome-BGC initialization files for the spinup.", 
-                                                                                         "Path to the .ini files (one path per site/scenario).")),
-    createsOutput(objectName = "bbgc.ini", objectClass = "character", desc =  paste("Biome-BGC initialization files.", 
-                                                                                    "Path to the .ini files (one path per site/scenario)."))
+    createsOutput(
+      objectName = "bbgcSpinup.ini",
+      objectClass = "character",
+      desc = paste(
+        "Biome-BGC initialization files for the spinup.",
+        "Path to the .ini files (one path per site/scenario)."
+      )
+    ),
+    createsOutput(
+      objectName = "bbgc.ini",
+      objectClass = "character",
+      desc =  paste(
+        "Biome-BGC initialization files.",
+        "Path to the .ini files (one path per site/scenario)."
+      )
+    ),
+    createsOutput("pixelGroupMap", "SpatRaster", desc = paste("")),
+    createsOutput("pixelGroupParameters", "data.frame", desc = paste(""))
   )
 ))
 
@@ -518,9 +526,9 @@ prepareSpinupIni <- function(sim) {
 }
 
 prepareIni <- function(sim) {
-  
   # Start from the spinup ini
   bbgc.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
+    
     ini <- sim$bbgcSpinup.ini[[pixelGroup_i]]
     parameters <- sim$pixelGroupParameters[pixelGroup == pixelGroup_i, ]
     
@@ -560,6 +568,17 @@ prepareIni <- function(sim) {
     
     # Change the RAMP_NDEP section
     ini <- iniSet(ini, "RAMP_NDEP", 1, P(sim)$NDepositionLevel[1])
+    
+    # Change OUTPUT_CONTROL section
+    fileName <- file.path("outputs", paste0(pixelGroup_i, "_out"))
+    ini <- iniSet(ini, "OUTPUT_CONTROL", 1, fileName)
+    ini <- iniSet(ini, "OUTPUT_CONTROL", 2:6, c(
+      1, # 1 = write daily output   0 = no daily output
+      1, # 1 = monthly avg of daily variables  0 = no monthly avg
+      1, # 1 = annual avg of daily variables   0 = no annual avg
+      1, # 1 = write annual output  0 = no annual output
+      1  # for on-screen progress indicator
+    )) 
     
     return(ini)
   })
