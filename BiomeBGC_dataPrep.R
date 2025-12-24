@@ -214,6 +214,8 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
     eventType,
     init = {
       
+      sim <- preparePixelGroups(sim)
+      
       sim <- prepareSpinupIni(sim)
       
       sim <- prepareIni(sim)
@@ -269,6 +271,53 @@ plotFun <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
   
   # ! ----- STOP EDITING ----- ! #
+  return(invisible(sim))
+}
+
+preparePixelGroups <- function(sim) {
+  if("ECODISTRIC" %in% names(sim$climatePolygons)){
+    field <- "ECODISTRIC"
+  } else {
+    field <- ""
+  }
+  sim$pixelGroupParameters <- data.table(
+    pixelIndex = 1:ncell(sim$rasterToMatch),
+    climatePolygon = values(rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)),
+    dominantSpecies = values(sim$dominantSpecies) |> as.vector(),
+    soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
+    soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
+    soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
+    soilAlbedo = values(sim$soilTexture$silt) |> as.vector(),
+    NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
+    NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
+    NfixationRate = values(sim$NfixationRates) |> as.vector(),
+    elevation = values(sim$elevation) |> as.vector(),
+    snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
+  ) 
+  nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
+  sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
+  
+  cols <- setdiff(names(sim$pixelGroupParameters), "pixelIndex")
+  
+  sim$pixelGroupParameters[, "pixelGroup"] <- LandR::generatePixelGroups(
+    sim$pixelGroupParameters,
+    maxPixelGroup = 0,
+    columns = cols
+  )
+  
+  sim$pixelGroupMap <- copy(sim$rasterToMatch)
+  values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
+  values(sim$pixelGroupMap)[is.na(sim$pixelGroupParameters$dominantSpecies)] <- NA
+  
+  cols <- c(cols, "pixelGroup")
+  sim$pixelGroupParameters <- unique(
+    sim$pixelGroupParameters[,  ..cols],
+    by = "pixelGroup"
+  ) |> na.omit()
+  
+  setkey(sim$pixelGroupParameters, pixelGroup)
+  setcolorder(sim$pixelGroupParameters, "pixelGroup")
+  
   return(invisible(sim))
 }
 
@@ -704,53 +753,6 @@ prepareIni <- function(sim) {
     
   }
   
-  # pixelGroups
-  if (!suppliedElsewhere('pixelGroupParameters', sim)) {
-    if("ECODISTRIC" %in% names(sim$climatePolygons)){
-      field <- "ECODISTRIC"
-    } else {
-      field <- ""
-    }
-    sim$pixelGroupParameters <- data.table(
-      pixelIndex = 1:ncell(sim$rasterToMatch),
-      climatePolygon = values(rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)),
-      dominantSpecies = values(sim$dominantSpecies) |> as.vector(),
-      soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
-      soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
-      soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
-      soilAlbedo = values(sim$soilTexture$silt) |> as.vector(),
-      NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
-      NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
-      NfixationRate = values(sim$NfixationRates) |> as.vector(),
-      elevation = values(sim$elevation) |> as.vector(),
-      snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
-    ) 
-    
-    cols <- setdiff(names(sim$pixelGroupParameters), "pixelIndex")
-    
-    sim$pixelGroupParameters[, "pixelGroup"] <- LandR::generatePixelGroups(
-      sim$pixelGroupParameters,
-      maxPixelGroup = 0,
-      columns = cols
-    )
-    sim$pixelGroupParameters
-    
-    sim$pixelGroupMap <- copy(sim$rasterToMatch)
-    values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
-    values(sim$pixelGroupMap)[is.na(sim$pixelGroupParameters$dominantSpecies)] <- NA
-    
-    cols <- c(cols, "pixelGroup")
-    sim$pixelGroupParameters <- unique(
-      sim$pixelGroupParameters[,  ..cols],
-      by = "pixelGroup"
-    ) |> na.omit()
-    
-    setkey(sim$pixelGroupParameters, pixelGroup)
-    setcolorder(sim$pixelGroupParameters, "pixelGroup")
-    
-  }
-  
-  # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
 
