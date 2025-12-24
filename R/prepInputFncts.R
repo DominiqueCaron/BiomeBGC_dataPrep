@@ -1,4 +1,5 @@
 ## Functions used to in the .inputObjects event:
+# prepNTEMSDominantSpecies
 # prepSoilTexture
 # prepNdeposition
 # rvestAlbedoTable
@@ -7,22 +8,47 @@
 # prepWhite2010EPC
 # prepClimate
 
+# Extract dominant species from NTEMS layers
+prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, maskTo, method = "mode"){
+  # prepare url and targetFile for prepInput call
+  domSppURL <- paste0("https://opendata.nfis.org/downloads/forest_change/CA_Tree_Species_Classification_", year, ".zip")
+  domSppTF <- paste0("CA_Forest_Tree_Species_", year, ".tif")  
+  
+  # prepInput
+  dominantSpecies <- prepInputs(
+    targetFile = domSppTF,
+    url = domSppURL,
+    destinationPath = destinationPath,
+    cropTo = cropTo,
+    projectTo = projectTo,
+    maskTo = maskTo,
+    method = method
+  )
+  # set 0 to NA
+  NAflag(dominantSpecies) <- 0
+  
+  # Transform NTEMS code to speciesCode
+  cls <- unique(LandR::sppEquivalencies_CA[, c("NTEMS_Species_Code", "LandR")]) |> na.omit()
+  names(cls) <- c("id", "category")
+  levels(dominantSpecies) <- cls
+  
+  return(dominantSpecies)
+}
+
 # Extract % of sand, % of clay and % of silt from CanSIS dataset
-prepSoilTexture <- function(destinationPath, studyArea){
+prepSoilTexture <- function(destinationPath, to){
   sand <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 100),
-    projectTo = crs(studyArea)
-  )
+    to = to
+  ) |> round()
   clay <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 100),
-    projectTo = crs(studyArea)
-  )
+    to = to
+  ) |> round()
   silt <- 100 - (sand + clay)
   soilTexture <- c(sand, silt, clay)
   names(soilTexture) <- c("sand", "silt", "clay")
@@ -30,29 +56,28 @@ prepSoilTexture <- function(destinationPath, studyArea){
 }
 
 # Extract N-deposition data for 2 years.
-prepNdeposition <- function(destinationPath, studyArea, year1, year2){
+prepNdeposition <- function(destinationPath, to, year1, year2){
   Ndeposition1 <- prepInputs(
     targetFile = paste0("mean_totN_", year1, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
     overwrite = TRUE,
     url = "https://springernature.figshare.com/ndownloader/files/48644623",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 1000),
-    projectTo = crs(studyArea),
+    to = to,
     fun = "terra::rast"
-  )
+  ) |> round()
   Ndeposition2 <- prepInputs(
     targetFile = paste0("mean_totN_", year2, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
     overwrite = TRUE,
     url = "https://springernature.figshare.com/ndownloader/files/48644623",
     destinationPath = destinationPath,
-    cropTo = buffer(studyArea, 1000),
-    projectTo = crs(studyArea),
+    to = to,
     fun = "terra::rast"
-  )
+  ) |> round()
   Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
   names(Ndeposition) <- as.character(c(year1, year2))
+  
   return(Ndeposition)
 }
 
@@ -279,21 +304,27 @@ prepWhite2010EPC <- function(url, sppEquiv, destinationPath){
 }
 
 # Extract the meteorological data
-prepClimate <- function(studyArea, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
+prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude
-  latlon <- round(crds(project(studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84")), 2)
-  lon <- latlon[1]
-  lat <- latlon[2]
+  latlon <- project(crds(centroids(climatePolygons)), crs(climatePolygons), "EPSG:4326")
+  lon <- latlon[,1]
+  lat <- latlon[,2]
+  
+  if ("ECODISTRIC" %in% names(climatePolygons)){
+    id = climatePolygons$ECODISTRIC
+  } else {
+    id = c(1:length(climatePolygons))
+  }
   
   # get climate from BioSim
   climate <- generateWeather(
     modelNames = c("Climatic_Daily", "VaporPressureDeficit_Daily"),
     fromYr = firstYear,
     toYr = lastYear,
-    id = siteName,
+    id = id,
     latDeg = lat,
     longDeg = lon,
     rcp = scenario,
@@ -301,67 +332,69 @@ prepClimate <- function(studyArea, siteName, firstYear, lastYear, lastSpinupYear
     additionalParms = NULL
   )
   
-  # remove 1 day from leap years (February 29)
-  climate <- lapply(climate, FUN = function(x){
-    x <- x[x$Month != 2 | x$Day != 29,]
-  })
+  # format climate data, 1 ecodistrict at a time
+  climOut <- list()
+  for (i in id) {
+    climate_i <- lapply(climate, FUN = function(x){
+      x <- x[x$KeyID == i, ]
+      x <- x[x$Month != 2 | x$Day != 29,]
+      x
+    })
+    
+    daylen <- daylength(lat[id == i], 1:365) * 60 * 60
+    
+    climate_i <- data.frame(
+      year = climate_i[["Climatic_Daily"]]$Year,
+      yday = 1:365,
+      tmax = climate_i[["Climatic_Daily"]]$Tmax,
+      tmin = climate_i[["Climatic_Daily"]]$Tmin,
+      tday = climate_i[["Climatic_Daily"]]$Tair,
+      prcp = climate_i[["Climatic_Daily"]]$Prcp/10, # from mm to cm
+      vpd = climate_i[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
+      srad = climate_i[["Climatic_Daily"]]$SRad,
+      daylen = daylen,
+      spinup = climate_i[["Climatic_Daily"]]$Year <= lastSpinupYear
+    )
+    
+    spinupFileName <- tolower(paste0(
+      i,
+      "_",
+      climModel,
+      scenario,
+      "_spinup.mtc43"
+    ))
+    spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
+    
+    metWrite(
+      metData = climate_i[climate_i$spinup, c(1:10)],
+      fileName = spinupFileName,
+      siteName  = paste0("Climate Polygon: ", i),
+      dataSource = paste(climModel, scenario, sep = ": ")
+    )
+    
+    # Met data for main simulation
+    fileName <- tolower(paste0(
+      i,
+      "_",
+      climModel,
+      scenario,
+      "_",
+      firstYear,
+      lastYear,
+      ".mtc43"
+    ))
+    fileName <- file.path(destinationPath, "metdata", fileName)
+    
+    metWrite(
+      metData = climate_i[, c(1:10)],
+      fileName = fileName,
+      siteName  = paste0("Climate Polygon: ", i),
+      dataSource = paste(climModel, scenario, sep = ": ")
+    )
+    
+    
+    climOut[[as.character(i)]] <- climate_i
+  }
   
-  # get day length in second
-  daylen <- daylength(lat, 1:365) * 60 * 60
-  
-  
-  # format climate data
-  climate <- data.frame(
-    year = climate[["Climatic_Daily"]]$Year,
-    yday = 1:365,
-    tmax = climate[["Climatic_Daily"]]$Tmax,
-    tmin = climate[["Climatic_Daily"]]$Tmin,
-    tday = climate[["Climatic_Daily"]]$Tair,
-    prcp = climate[["Climatic_Daily"]]$Prcp/10, # from mm to cm
-    vpd = climate[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
-    srad = climate[["Climatic_Daily"]]$SRad,
-    daylen = daylen,
-    spinup = climate[["Climatic_Daily"]]$Year <= lastSpinupYear
-  )
-  
-  # write to inputs
-  
-  # Met data for spinup
-  spinupFileName <- tolower(paste0(
-    siteName,
-    "_",
-    climModel,
-    scenario,
-    "_spinup.mtc43"
-  ))
-  spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
-  
-  metWrite(
-    metData = climate[climate$spinup, c(1:10)],
-    fileName = spinupFileName,
-    siteName  = siteName,
-    dataSource = paste(climModel, scenario, sep = ": ")
-  )
-  
-  # Met data for main simulation
-  fileName <- tolower(paste0(
-    siteName,
-    "_",
-    climModel,
-    scenario,
-    "_",
-    firstYear,
-    lastYear,
-    ".mtc43"
-  ))
-  fileName <- file.path(destinationPath, "metdata", fileName)
-  
-  metWrite(
-    metData = climate[, c(1:10)],
-    fileName = fileName,
-    siteName  = siteName,
-    dataSource = paste(climModel, scenario, sep = ": ")
-  )
-  
-  return(climate)
+  return(climOut)
 }
