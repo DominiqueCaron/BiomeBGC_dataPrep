@@ -551,7 +551,7 @@ prepareIni <- function(sim) {
     ini <- iniSet(ini, "RESTART", 6, file.path("inputs", "restart", paste0(pixelGroup_i, "_out.restart")))
     
     # Change the TIME_DEFINE section
-    nyear <- length(unique(sim$meteorologicalData$year))
+    nyear <- length(unique(sim$meteorologicalData[[1]]$year))
     ini <- iniSet(ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
     ini <- iniSet(ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1) # number of simulation years
     ini <- iniSet(ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
