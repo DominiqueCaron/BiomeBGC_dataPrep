@@ -507,70 +507,64 @@ prepareSpinupIni <- function(sim) {
     }
     spinupIni <- iniSet(spinupIni, "W_STATE", 2, P(sim)$waterState[2])
     
+    return(spinupIni)
   })
   
   # add to simList
+  names(bbgcSpinup.ini) <- sim$pixelGroupParameters$pixelGroup
   sim$bbgcSpinup.ini <- bbgcSpinup.ini
   
   return(invisible(sim))
 }
 
 prepareIni <- function(sim) {
+  
   # Start from the spinup ini
-  bbgc.ini <- sim$bbgcSpinup.ini
+  bbgc.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
+    ini <- sim$bbgcSpinup.ini[[pixelGroup_i]]
+    parameters <- sim$pixelGroupParameters[pixelGroup == pixelGroup_i, ]
+    
+    ## Set MET_INPUT section
+    fileName <- tolower(paste0(
+      parameters$climatePolygon,
+      "_",
+      P(sim)$climModel,
+      P(sim)$co2scenario,
+      "_",
+      start(sim),
+      end(sim),
+      ".mtc43"
+    ))
+    ini <- iniSet(ini, "MET_INPUT", 1, file.path("inputs", "metdata", fileName))
+    
+    # Change the RESTART section
+    ini <- iniSet(ini, "RESTART", c(1:4), c(1, 0, 0, 0))
+    ini <- iniSet(ini, "RESTART", 5, file.path("inputs", "restart", paste0(pixelGroup_i, ".restart")))
+    ini <- iniSet(ini, "RESTART", 6, file.path("inputs", "restart", paste0(pixelGroup_i, "_out.restart")))
+    
+    # Change the TIME_DEFINE section
+    nyear <- length(unique(sim$meteorologicalData$year))
+    ini <- iniSet(ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
+    ini <- iniSet(ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1) # number of simulation years
+    ini <- iniSet(ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
+    ini <- iniSet(ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
+    
+    # Change the CO2 section
+    fileName <- paste("co2",
+                      start(sim),
+                      end(sim),
+                      paste0(P(sim)$co2scenario, ".txt"),
+                      sep = "_")
+    ini <- iniSet(ini, "CO2_CONTROL", 1, 1)
+    ini <- iniSet(ini, "CO2_CONTROL", 3, file.path("inputs", "co2", fileName))
+    
+    # Change the RAMP_NDEP section
+    ini <- iniSet(ini, "RAMP_NDEP", 1, P(sim)$NDepositionLevel[1])
+    
+    return(ini)
+  })
   
-  ## Set MET_INPUT section
-  fileName <- tolower(paste0(
-    P(sim)$siteName,
-    "_",
-    P(sim)$climModel,
-    P(sim)$co2scenario,
-    "_",
-    start(sim),
-    end(sim),
-    ".mtc43"
-  ))
-  bbgc.ini <- iniSet(bbgc.ini,
-                     "MET_INPUT",
-                     1,
-                     file.path("inputs", "metdata", fileName))
-  
-  # Change the RESTART section
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", c(1:4), c(1, 0, 0, 0))
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 5, file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
-  bbgc.ini <- iniSet(bbgc.ini, "RESTART", 6, file.path("inputs", "restart", paste0(P(sim)$siteNames, "_out.restart")))
-  
-  # Change the TIME_DEFINE section
-  nyear <- length(unique(sim$meteorologicalData$year))
-  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
-  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1) # number of simulation years
-  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
-  bbgc.ini <- iniSet(bbgc.ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
-  
-  # Change the CO2 section
-  fileName <- paste("co2", start(sim), end(sim), paste0(P(sim)$co2scenario, ".txt"), sep = "_")
-  bbgc.ini <- iniSet(bbgc.ini, "CO2_CONTROL", 1, 1)
-  bbgc.ini <- iniSet(bbgc.ini,
-                     "CO2_CONTROL",
-                     3,
-                     file.path("inputs", "co2", fileName))
-  
-  # Change the RAMP_NDEP section
-  bbgc.ini <- iniSet(bbgc.ini, "RAMP_NDEP", 1, P(sim)$NDepositionLevel[1])
-  
-  # Change OUTPUT_CONTROL section
-  bbgc.ini <- iniSet(bbgc.ini,
-                     "OUTPUT_CONTROL",
-                     1,
-                     file.path("outputs", P(sim)$siteNames))
-  bbgc.ini <- iniSet(bbgc.ini, "OUTPUT_CONTROL", 2:6, c(
-    1, # 1 = write daily output   0 = no daily output
-    1, # 1 = monthly avg of daily variables  0 = no monthly avg
-    1, # 1 = annual avg of daily variables   0 = no annual avg
-    1, # 1 = write annual output  0 = no annual output
-    1  # for on-screen progress indicator
-  )) 
-  
+  names(bbgc.ini) <- sim$pixelGroupParameters$pixelGroup
   sim$bbgc.ini <- bbgc.ini
   
   return(invisible(sim))
