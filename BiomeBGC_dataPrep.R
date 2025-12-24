@@ -280,18 +280,25 @@ preparePixelGroups <- function(sim) {
   } else {
     field <- ""
   }
+  dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
+  latitudes <- project(crds(sim$rasterToMatch), crs(sim$rasterToMatch), "EPSG:4326")[,2]
+  speciesNames <- cats(sim$dominantSpecies)[[1]]$category
+  dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
   sim$pixelGroupParameters <- data.table(
     pixelIndex = 1:ncell(sim$rasterToMatch),
-    climatePolygon = values(rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)),
-    dominantSpecies = values(sim$dominantSpecies) |> as.vector(),
+    climatePolygon = values(
+      rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)
+    ) |> as.vector(),
+    dominantSpecies = dominantSpeciesInPixels,
     soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
     soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
     soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
-    soilAlbedo = values(sim$soilTexture$silt) |> as.vector(),
+    soilAlbedo = values(sim$shortwaveAlbedo) |> as.vector(),
     NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
     NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
     NfixationRate = values(sim$NfixationRates) |> as.vector(),
     elevation = values(sim$elevation) |> as.vector(),
+    latitude = round(latitudes, 1),
     snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
   ) 
   nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
@@ -322,179 +329,185 @@ preparePixelGroups <- function(sim) {
 }
 
 prepareSpinupIni <- function(sim) {
-  # First read the ini template
-  bbgcSpinup.ini <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
+  iniTemplate <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
   
-  ## Set MET_INPUT section
-  fileName <- tolower(paste0(
-    P(sim)$siteName,
-    "_",
-    P(sim)$climModel,
-    P(sim)$co2scenario,
-    "_spinup.mtc43"
-  ))
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "MET_INPUT", 1, 
-                           file.path("inputs", "metdata", fileName))
-  ## Set RESTART section
-  # TODO: make sure that the 
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RESTART", c(1:4), c(0, 1, 0, 0))
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
-                           "RESTART",
-                           c(5, 6),
-                           file.path("inputs", "restart", paste0(P(sim)$siteNames, ".restart")))
-  
+  # set sections that are shared across all pixelGroups
   ## Set TIME_DEFINE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 1, P(sim)$metSpinupYears) # number of year in the metdata
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 2, P(sim)$metSpinupYears) # number of simulation years
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
+  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 1, P(sim)$metSpinupYears) # number of year in the metdata
+  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 2, P(sim)$metSpinupYears) # number of simulation years
+  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 3, start(sim)) #first simulation year
+  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
+  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
   
   ## Set CLIM_CHANGE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CLIM_CHANGE", c(1:5), P(sim)$climateChangeOptions)
+  iniTemplate <- iniSet(iniTemplate, "CLIM_CHANGE", c(1:5), P(sim)$climateChangeOptions)
   
   ## Set CO2_CONTROL section
   # TODO: make sure that co2 is always constant for the spinup. If so, which year?
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "CO2_CONTROL", 2, sim$CO2concentration[sim$CO2concentration$year == start(sim), "co2_ppm"])
-  
-  ## Set SITE section
-  # For each check if NA, if it is get the value from different sources
-  # Rooting zone soil depth, if NA set to 1m
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 1, 
-                           ifelse(is.na(P(sim)$siteConstants[1]), 
-                                  1, 
-                                  P(sim)$siteConstants[1]))
-  
-  # Soil texture: % of sand, % of silt, % of clay
-  if(is.na(P(sim)$siteConstants[2])){
-    soilTexture <- extract(sim$soilTexture, sim$studyArea) |> round(digits = 1)
-    # Make sure that sum == 100 after rounding.
-    soilTexture[, "silt"] <- 100 - (soilTexture[, "sand"] + soilTexture[, "clay"])
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4),
-                             soilTexture[,-1])
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", c(2:4),
-                             P(sim)$siteConstants[c(2:4)])
-  }
-  
-  # Elevation
-  if(is.na(P(sim)$siteConstants[5])){
-    elevation <- extract(sim$elevation, sim$studyArea)[,2]
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, elevation)
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 5, P(sim)$siteConstants[5])
-  }
-  
-  # Latitude
-  if (is.na(P(sim)$siteConstants[6])) {
-    latitude <- round(crds(project(sim$studyArea, "+proj=longlat +ellps=WGS84 +datum=WGS84"))[2], 2)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, latitude)
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 6, P(sim)$siteConstants[6])
-  }
-  
-  # Site shortwave albedo
-  if (is.na(P(sim)$siteConstants[7])) {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, sim$shortwaveAlbedo)
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 7, P(sim)$siteConstants[7])
-  }
-  
-  # wet+dry atmospheric deposition of N
-  if (is.na(P(sim)$siteConstants[8])) {
-    Ndeposition <- extract(sim$Ndeposition[[1]], sim$studyArea)[,2] |> round(digits = 5)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, format(Ndeposition, scientific = FALSE, trim = TRUE))
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 8, P(sim)$siteConstants[8])
-  }
-  
-  # symbiotic+asymbiotic fixation of N
-  if (is.na(P(sim)$siteConstants[9])) {
-    NfixationRate <- extract(sim$NfixationRates, sim$studyArea)[,2] |> round(digits = 4)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini,
-                             "SITE",
-                             9,
-                             format(NfixationRate, scientific = FALSE, trim = TRUE))
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "SITE", 9, P(sim)$siteConstants[9])
-  }
-  
-  # Set RAMP_NDEP section
-  # TODO: Make sure that it is always constant during spinup
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 1, 0)
-  if(P(sim)$NDeposition[1] == 1 & is.na(P(sim)$NDeposition[2])){
-    year2 <- names(sim$Ndeposition[[2]])
-    Ndeposition2 <- extract(sim$Ndeposition[[2]], sim$studyArea)[,2] |> round(digits = 5)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 2, year2)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", 3, format(Ndeposition2, scientific = FALSE, trim = TRUE))
-  } else if (P(sim)$NDeposition[1] == 1 & !is.na(P(sim)$NDeposition[2])){
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "RAMP_NDEP", c(2,3), P(sim)$NDeposition[c(2,3)])
-  }
-  
-  # Set EPC_FILE section
-  # extract the correct dominant species
-  dominantSpecies <- extract(sim$dominantSpecies, sim$studyArea)[-1]
-  dominantSpecies <- unique(names(dominantSpecies)[dominantSpecies==1])
-  if(length(dominantSpecies) == 0){
-    stop("Study area is not a forested treed-area.")
-  }
-  dominantSpecies <- sim$sppEquiv$species[sim$sppEquiv$speciesId == dominantSpecies]
-  # set filename
-  fileName <- tolower(paste0(gsub(" ", "", dominantSpecies), ".epc"))
-  # set in ini file
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "EPC_FILE", 1, 
-                           file.path("inputs", "epc", fileName))
-  
-  # Set W_STATE section
-  if(is.na(P(sim)$waterState[1])){
-    snowpackWaterContent <- extract(sim$snowpackWaterContent, sim$studyArea)[, 2] |> round(digits = 1)
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1, snowpackWaterContent)
-  } else {
-    bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 1, P(sim)$waterState[1])
-  }
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "W_STATE", 2, P(sim)$waterState[2])
+  iniTemplate <- iniSet(iniTemplate, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
+  iniTemplate <- iniSet(iniTemplate, "CO2_CONTROL", 2, sim$CO2concentration[sim$CO2concentration$year == start(sim), "co2_ppm"])
   
   # Set C_STATE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "C_STATE", 1:11, P(sim)$carbonState)
+  iniTemplate <- iniSet(iniTemplate, "C_STATE", 1:11, P(sim)$carbonState)
   
   # Set N_STATE section
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "N_STATE", 1:2, P(sim)$nitrogenState)
+  iniTemplate <- iniSet(iniTemplate, "N_STATE", 1:2, P(sim)$nitrogenState)
   
   # Set OUTPUT_CONTROL section
   # TODO make sure this is what we want for the spinup
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 1, 
-                           file.path("outputs", paste0(P(sim)$siteNames, "_spinup")))
-  bbgcSpinup.ini <- iniSet(bbgcSpinup.ini, "OUTPUT_CONTROL", 2:6, 
-                           c(0, # 1 = write daily output   0 = no daily output
-                             0, # 1 = monthly avg of daily variables  0 = no monthly avg
-                             0, # 1 = annual avg of daily variables   0 = no annual avg
-                             1, # 1 = write annual output  0 = no annual output
-                             1)) # for on-screen progress indicator
+  iniTemplate <- iniSet(iniTemplate, "OUTPUT_CONTROL", 2:6, 
+                        c(0, # 1 = write daily output   0 = no daily output
+                          0, # 1 = monthly avg of daily variables  0 = no monthly avg
+                          0, # 1 = annual avg of daily variables   0 = no annual avg
+                          0, # 1 = write annual output  0 = no annual output
+                          1)) # for on-screen progress indicator
   
   # Set DAILY_OUTPUT section
   nDailyOutput <- length(P(sim)$dailyOutput)
   # Rewrite, it is easier given that the size of the section varies
-  bbgcSpinup.ini[["DAILY_OUTPUT"]] <- rbind(bbgcSpinup.ini[["DAILY_OUTPUT"]][1, ],
-                                            c(nDailyOutput, "(int)", "number of daily variables to output"))
-  bbgcSpinup.ini[["DAILY_OUTPUT"]] <- rbind(bbgcSpinup.ini[["DAILY_OUTPUT"]],
-                                            data.frame(
-                                              value = P(sim)$dailyOutput,
-                                              unit = c(0:(nDailyOutput-1)),
-                                              comment = getOutputDescription(P(sim)$dailyOutput)
-                                            ))
+  iniTemplate[["DAILY_OUTPUT"]] <- rbind(iniTemplate[["DAILY_OUTPUT"]][1, ],
+                                         c(nDailyOutput, "(int)", "number of daily variables to output"))
+  iniTemplate[["DAILY_OUTPUT"]] <- rbind(
+    iniTemplate[["DAILY_OUTPUT"]],
+    data.frame(
+      value = P(sim)$dailyOutput,
+      unit = c(0:(nDailyOutput -
+                    1)),
+      comment = getOutputDescription(P(sim)$dailyOutput)
+    )
+  )
   
   # Set ANNUAL_OUTPUT section
   nAnnOutput <- length(P(sim)$annualOutput)
   # Rewrite, it is easier given that the size of the section varies
-  bbgcSpinup.ini[["ANNUAL_OUTPUT"]] <- rbind(bbgcSpinup.ini[["ANNUAL_OUTPUT"]][1, ],
-                                             c(nAnnOutput, "(int)", "number of annual output variables"))
-  bbgcSpinup.ini[["ANNUAL_OUTPUT"]] <- rbind(bbgcSpinup.ini[["ANNUAL_OUTPUT"]],
-                                             data.frame(
-                                               value = P(sim)$annualOutput,
-                                               unit = c(0:(nAnnOutput-1)),
-                                               comment = getOutputDescription(P(sim)$annualOutput)
-                                             ))
+  iniTemplate[["ANNUAL_OUTPUT"]] <- rbind(iniTemplate[["ANNUAL_OUTPUT"]][1, ],
+                                          c(nAnnOutput, "(int)", "number of annual output variables"))
+  iniTemplate[["ANNUAL_OUTPUT"]] <- rbind(iniTemplate[["ANNUAL_OUTPUT"]],
+                                          data.frame(
+                                            value = P(sim)$annualOutput,
+                                            unit = c(0:(nAnnOutput-1)),
+                                            comment = getOutputDescription(P(sim)$annualOutput)
+                                          ))
+  # Create a list of ini files: 1 file per pixelGroup
+  bbgcSpinup.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
+    # First read the ini template
+    spinupIni <- iniTemplate
+    
+    parameters <- sim$pixelGroupParameters[pixelGroup == pixelGroup_i, ]
+    
+    ## Set MET_INPUT section
+    fileName <- tolower(paste0(
+      parameters$climatePolygon,
+      "_",
+      P(sim)$climModel,
+      P(sim)$co2scenario,
+      "_spinup.mtc43"
+    ))
+    spinupIni <- iniSet(spinupIni,
+                        "MET_INPUT",
+                        1,
+                        file.path("inputs", "metdata", fileName))
+    
+    ## Set RESTART section
+    # TODO: make sure that the
+    spinupIni <- iniSet(spinupIni, "RESTART", c(1:4), c(0, 1, 0, 0))
+    spinupIni <- iniSet(spinupIni,
+                        "RESTART",
+                        c(5, 6),
+                        file.path("inputs", "restart", paste0(pixelGroup_i, ".restart")))
+    
+    ## Set SITE section
+    # For each check if NA, if it is get the value from different sources
+    # Rooting zone soil depth, if NA set to 1m
+    spinupIni <- iniSet(spinupIni, "SITE", 1, ifelse(is.na(P(sim)$siteConstants[1]), 1, P(sim)$siteConstants[1]))
+    
+    # Soil texture: % of sand, % of silt, % of clay
+    if(is.na(P(sim)$siteConstants[2])){
+      spinupIni <- iniSet(spinupIni, "SITE", c(2:4), 
+                          parameters[, c("soilSandContent", "soilSiltContent", "soilClayContent")])
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", c(2:4),
+                          P(sim)$siteConstants[c(2:4)])
+    }
+    
+    # Elevation
+    if(is.na(P(sim)$siteConstants[5])){
+      spinupIni <- iniSet(spinupIni, "SITE", 5, parameters$elevation)
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", 5, P(sim)$siteConstants[5])
+    }
+    
+    # Latitude
+    if (is.na(P(sim)$siteConstants[6])) {
+      spinupIni <- iniSet(spinupIni, "SITE", 6, parameters$elevation)
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", 6, P(sim)$siteConstants[6])
+    }
+    
+    # Site shortwave albedo
+    if (is.na(P(sim)$siteConstants[7])) {
+      spinupIni <- iniSet(spinupIni, "SITE", 7, parameters$soilAlbedo)
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", 7, P(sim)$siteConstants[7])
+    }
+    
+    # wet+dry atmospheric deposition of N
+    if (is.na(P(sim)$siteConstants[8])) {
+      spinupIni <- iniSet(spinupIni,
+                          "SITE",
+                          8,
+                          format(
+                            parameters$NdepositionT1,
+                            scientific = FALSE,
+                            trim = TRUE
+                          ))
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", 8, P(sim)$siteConstants[8])
+    }
+    
+    # symbiotic+asymbiotic fixation of N
+    if (is.na(P(sim)$siteConstants[9])) {
+      spinupIni <- iniSet(spinupIni,
+                          "SITE",
+                          9,
+                          format(
+                            parameters$NfixationRate,
+                            scientific = FALSE,
+                            trim = TRUE
+                          ))
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", 9, P(sim)$siteConstants[9])
+    }
+    
+    # Set RAMP_NDEP section
+    # TODO: Make sure that it is always constant during spinup
+    spinupIni <- iniSet(spinupIni, "RAMP_NDEP", 1, 0)
+    if(P(sim)$NDeposition[1] == 1 & is.na(P(sim)$NDeposition[2])){
+      year2 <- names(sim$Ndeposition[[2]])
+      Ndeposition2 <- parameters$NdepositionT2
+      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", 2, year2)
+      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", 3, format(Ndeposition2, scientific = FALSE, trim = TRUE))
+    } else if (P(sim)$NDeposition[1] == 1 & !is.na(P(sim)$NDeposition[2])){
+      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", c(2,3), P(sim)$NDeposition[c(2,3)])
+    }
+    
+    # Set EPC_FILE section
+    # extract the correct dominant species
+    dominantSpecies <- sim$sppEquiv$species[sim$sppEquiv$speciesId == parameters$dominantSpecies]
+    # set filename
+    fileName <- tolower(paste0(gsub(" ", "", dominantSpecies), ".epc"))
+    # set in ini file
+    spinupIni <- iniSet(spinupIni, "EPC_FILE", 1, file.path("inputs", "epc", fileName))
+    
+    # Set W_STATE section
+    if(is.na(P(sim)$waterState[1])){
+      spinupIni <- iniSet(spinupIni, "W_STATE", 1, parameters$snowPackWaterContent)
+    } else {
+      spinupIni <- iniSet(spinupIni, "W_STATE", 1, P(sim)$waterState[1])
+    }
+    spinupIni <- iniSet(spinupIni, "W_STATE", 2, P(sim)$waterState[2])
+    
+  })
   
   # add to simList
   sim$bbgcSpinup.ini <- bbgcSpinup.ini
