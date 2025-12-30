@@ -697,7 +697,8 @@ prepareIni <- function(sim) {
       overwrite = TRUE,
       url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      projectTo = sim$rasterToMatch,
+      maskTo = sim$studyArea,
       fun = "terra::rast"
     ) |> Cache()
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
