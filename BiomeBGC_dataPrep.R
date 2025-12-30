@@ -528,8 +528,7 @@ prepareSpinupIni <- function(sim) {
 prepareIni <- function(sim) {
   # Start from the spinup ini
   bbgc.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
-    
-    ini <- sim$bbgcSpinup.ini[[pixelGroup_i]]
+    ini <- sim$bbgcSpinup.ini[[as.character(pixelGroup_i)]]
     parameters <- sim$pixelGroupParameters[pixelGroup == pixelGroup_i, ]
     
     ## Set MET_INPUT section
@@ -582,7 +581,6 @@ prepareIni <- function(sim) {
     
     return(ini)
   })
-  
   names(bbgc.ini) <- sim$pixelGroupParameters$pixelGroup
   sim$bbgc.ini <- bbgc.ini
   
@@ -670,15 +668,12 @@ prepareIni <- function(sim) {
   # Elevation raster
   # Default source: Amazon Web Services Terrain Tiles
   if (!suppliedElsewhere('elevation', sim)) {
-    elevation <-  get_elev_raster(
-      locations = sf::st_as_sf(sim$studyArea),
-      z = 10
-    ) |> Cache()
-    elevation <- postProcessTo(
-      rast(elevation),
+    
+    sim$elevation <- prepElevation(
+      studyArea = sim$studyArea,
       to = sim$rasterToMatch
     ) |> Cache()
-    sim$elevation <- signif(elevation, 3)
+    
   }
   
   # Total N deposition
@@ -731,7 +726,7 @@ prepareIni <- function(sim) {
     
     # We use the average for January of the first year.
     layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
-    sim$snowpackWaterContent <- round(sim$snowpackWaterContent[[layerToKeep]], 0)
+    sim$snowpackWaterContent <- round(sim$snowpackWaterContent[[layerToKeep]], -1)
     terra::units(sim$snowpackWaterContent) <- "kg/m^2"
   }
   

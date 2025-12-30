@@ -42,13 +42,13 @@ prepSoilTexture <- function(destinationPath, to){
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) |> round()
+  ) |> round(digits = -1)
   clay <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) |> round()
+  ) |> round(digits = -1)
   silt <- 100 - (sand + clay)
   soilTexture <- c(sand, silt, clay)
   names(soilTexture) <- c("sand", "silt", "clay")
@@ -397,4 +397,23 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
   }
   
   return(climOut)
+}
+
+# Extract elevation raster
+prepElevation <- function(studyArea, to){
+  
+  # get data from Amazon Web Services Terrain Tiles
+  elevation <-  get_elev_raster(
+    locations = sf::st_as_sf(studyArea),
+    z = 10
+  )
+  
+  # Crop and project to raster
+  elevation <- postProcessTo(
+    rast(elevation),
+    to = to
+  )
+  
+  # round to 10m
+  return(round(elevation, -1))
 }
