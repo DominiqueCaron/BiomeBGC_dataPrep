@@ -392,7 +392,7 @@ lccToAlbedo <- function(lcc, albedoTable, rasterToMatch){
   LCCval <- values(lcc)
   latitudes <- project(crds(rasterToMatch, na.rm = FALSE), crs(rasterToMatch), "EPSG:4326")[,2]
   
-  colIds <- ifelse(latitudes > 60, 3, ifelse(latitudes > 50, 4, ifelse(latitude > 40, 5, 6)))
+  colIds <- ifelse(latitudes > 60, 3, ifelse(latitudes > 50, 4, ifelse(latitudes > 40, 5, 6)))
   rowIds <- ifelse(LCCval == 2, 7, ifelse(LCCval == 4, 5, ifelse(
     LCCval == 5, 3, ifelse(LCCval == 6, 1, ifelse(LCCval == 7, 4, NA))
   ))) |> as.vector()

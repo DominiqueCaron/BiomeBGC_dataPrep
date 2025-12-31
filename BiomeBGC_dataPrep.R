@@ -289,7 +289,7 @@ preparePixelGroups <- function(sim) {
     field <- ""
   }
   dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
-  latitudes <- project(crds(sim$rasterToMatch), crs(sim$rasterToMatch), "EPSG:4326")[,2]
+  latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
   speciesNames <- cats(sim$dominantSpecies)[[1]]$category
   dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
   sim$pixelGroupParameters <- data.table(
@@ -722,7 +722,8 @@ prepareIni <- function(sim) {
       url = "https://climate-scenarios.canada.ca/files/blended_snow_2024/swe_monthly_mm_1981-2020.zip",
       fun = "terra::rast",
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      projectTo = sim$rasterToMatch,
+      maskTo = sim$studyArea
     ) |> Cache()
     
     # We use the average for January of the first year.
