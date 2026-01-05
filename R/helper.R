@@ -420,7 +420,7 @@ getOutputDescription <- function(outputId){
     output_name = sub(".*&([^->]+)->([^;]+);.*", "\\1.\\2", name_lines)
   )
   
-  out <- outputTbl[output_id %in% outputId]$output_name
+  out <- outputTbl[match(outputId, outputTbl$output_id)]$output_name
   
   return(out)
 }
