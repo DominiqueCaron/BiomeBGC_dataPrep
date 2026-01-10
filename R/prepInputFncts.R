@@ -137,6 +137,26 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
   return(co2concentrations)
 }
 
+prepEPC <- function(url, sppEquiv, destinationPath){
+  # create a folder for epc in the destinationPath
+  dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
+  # read epc
+  epc <- prepInputs(targetFile = "defaultEPC.csv", 
+                    url = url, 
+                    destinationPath = destinationPath,
+                    fun = "data.table::fread",
+                    check.names = TRUE)
+  
+  # keep only the lines for the species in study
+  epc <- epc[epc$speciesId %in% sppEquiv$speciesId, ]
+  
+  # Write the species-level epcs in the destinationPath/epc folder
+  apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
+  
+  return(epc)
+}
+
+
 # Clean and format tables from White et al., 2000 (EPC constant)
 prepWhite2000Table <- function(tbl, value.var){
   # Remove plant functional types

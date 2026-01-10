@@ -647,8 +647,8 @@ prepareIni <- function(sim) {
   # Default source: White et al., 2000 https://doi.org/10.1175/1087-3562(2000)004<0003:PASAOT>2.0.CO;2
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
     
-    sim$ecophysiologicalConstants <- prepWhite2000EPC(
-      url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link",
+    sim$ecophysiologicalConstants <- prepEPC(
+      url = "https://drive.google.com/file/d/1bvPL_EjAOBbIuH0mmMSmDtoWANVA_Fw3/view?usp=sharing",
       sppEquiv = sim$sppEquiv,
       destinationPath = dPath
     ) |> Cache()

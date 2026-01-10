@@ -102,7 +102,8 @@ epcWrite2 <- function(epc, destinationPath){
                         "epc", 
                         fileName)
   #replace values
-  epcOut[, "value"] <- as.numeric(epc[-c(1,2)])
+  valueColNames <- names(initiateEPC())[-c(1,2)]
+  epcOut[, "value"] <- as.numeric(epc[valueColNames])
   # write file
   epcWrite(epcOut, fileName = fileName)
 }
