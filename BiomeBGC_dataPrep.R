@@ -135,9 +135,10 @@ defineModule(sim, list(
     ), 
     expectsInput("ecophysiologicalConstants", "data.frame", 
                  desc = paste(
-                   "Ecophysiological constants. Columns are species, genus, and",
+                   "Ecophysiological constants. Columns are speciesId, species, PFT, and",
                    "the ecological constants (see template). By default,",
-                   "ecophysiologicalConstants are built from White et al., 2000.")
+                   "ecophysiologicalConstants are extracted from White et al., 2000,",
+                   "Hessl et al., 2004, and TRY.")
     ),
     expectsInput("elevation", "SpatRaster",
                  desc = paste(
@@ -644,7 +645,6 @@ prepareIni <- function(sim) {
   }
   
   # Table of ecophysiological constants of each species Id
-  # Default source: White et al., 2000 https://doi.org/10.1175/1087-3562(2000)004<0003:PASAOT>2.0.CO;2
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
     
     sim$ecophysiologicalConstants <- prepEPC(

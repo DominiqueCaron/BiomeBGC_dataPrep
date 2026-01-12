@@ -4,8 +4,7 @@
 # prepNdeposition
 # rvestAlbedoTable
 # prepCo2Concentration
-# prepWhite2000Table
-# prepWhite2000EPC
+# prepEPC
 # prepClimate
 
 # Extract dominant species from NTEMS layers
@@ -137,6 +136,7 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
   return(co2concentrations)
 }
 
+#
 prepEPC <- function(url, sppEquiv, destinationPath){
   # create a folder for epc in the destinationPath
   dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
@@ -153,173 +153,6 @@ prepEPC <- function(url, sppEquiv, destinationPath){
   # Write the species-level epcs in the destinationPath/epc folder
   apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   
-  return(epc)
-}
-
-
-# Clean and format tables from White et al., 2000 (EPC constant)
-prepWhite2000Table <- function(tbl, value.var){
-  # Remove plant functional types
-  tbl <- tbl[tbl$Foliage.Nature %in% c("Evergreen needle leaf forest", "Deciduous broad leaf forest"),]
-  # Remove extra-spaces
-  tbl$Species <- trimws(tbl$Species)
-  # Standardize genus-level taxa
-  tbl$Species <- gsub(pattern = " spp.", "", tbl$Species)
-  # Transform into wide format
-  tbl <- dcast(as.data.table(tbl), Species ~ Parameter, value.var = value.var, fun.aggregate = mean)
-  # Extract genus
-  tbl[, Genus := sub(" .*", "", Species)]
-  # Table of species-level constants
-  tbl_sp <- tbl[Species != Genus, ]
-  tbl_sp[, Genus := NULL]
-  tbl_sp[, Level := "Species"]
-  # Table of genus-level constants - take mean across species
-  tbl[, Species := NULL]
-  tbl_genus <- tbl[, lapply(.SD, mean, na.rm = TRUE), by = Genus]
-  tbl_genus[, Level := "Genus"]
-  setnames(tbl_genus, "Genus", "Species")
-  # Combine genus and species-level constants
-  out <- rbindlist(list(tbl_sp, tbl_genus))
-  return(out)
-}
-
-# Prepares epc from the tables in white et al., 2000
-prepWhite2000EPC <- function(url, sppEquiv, destinationPath){
-  # create a folder for epc in the destinationPath
-  dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
-  
-  # get a epc template file
-  epc <- initiateEPC()
-  
-  ## append the enf and dbf plant functional types
-  epc <- rbindlist(list(epc, data.table(taxa = c("enf", "dbf"), level = "pft")), fill = TRUE)
-  enf <- epcRead("enf")
-  dbf <- epcRead("dbf")
-  epc[1, c(3:45)] <- data.table(matrix(enf$value, 1, 43))
-  epc[2, c(3:45)] <- data.table(matrix(dbf$value, 1, 43))
-  
-  ## Prepare parameters from White 2000
-  # Table 1
-  white2000_1 <- prepInputs(targetFile = "White_spreadsheet1.csv", 
-                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
-                            destinationPath = destinationPath,
-                            fun = "data.table::fread",
-                            check.names = TRUE)
-  # A bit of cleaning, removing typos and lines we do not need.
-  white2000_1$Species[white2000_1$Species == "Prunus pennsylvanica"] <- "Prunus pensylvanica"
-  white2000_1$Species[white2000_1$Species == "Rubus alleghaniensis"] <- "Rubus allegheniensis"
-  white2000_1$Species[white2000_1$Species == "Rubus allighaniensis"] <- "Rubus allegheniensis"
-  white2000_1$Species[white2000_1$Species == "Betula Papyrifera"] <- "Betula papyrifera"
-  white2000_1$Species[white2000_1$Species == "Sequoiadendron gigant."] <- "Sequoiadendron giganteum"
-  white2000_1$Species[white2000_1$Species == "Tillia americana"] <- "Tilia americana"
-  white2000_1 <- white2000_1[!(white2000_1$Species %in% c("DBF", "ENF", "Lonicera x bella", "Mixed deciduous", "Mixed pine", "Nyssa-Acer", "Quercus prinus/rubra", "Rain forest", "Tropical deciduous forest", "Tsuga/Picea", "Wood", "Picea/Abies", "Cedar")), ]
-  white2000_1 <- prepWhite2000Table(white2000_1, value.var = "Value")
-  names(white2000_1) <- c(
-    "taxa",
-    "CtoNDeadWood",
-    "CtoNFineRoots",
-    "newLiveWoodCToNewTotalWoodC",
-    "allToProjectLAI",
-    "CtoNLeaves",
-    "leafAndFineRootTurnover",
-    "canopyLightExtinction",
-    "CtoNLitter",
-    "newCoarseRootCToNewStemC",
-    "newFineRootCToNewLeafC",
-    "newStemCToNewLeafC",
-    "canopyAvgSLA",
-    "level"
-  )
-  
-  # White 2000 table 2
-  white2000_2 <- prepInputs(targetFile = "White_spreadsheet2.csv", 
-                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
-                            destinationPath = destinationPath,
-                            fun = "data.table::fread",
-                            check.names = TRUE)
-  # a bit of cleaning, removing typos and lines we do not need.
-  white2000_2$Species[white2000_2$Species == "Abies concolr"] <- "Abies concolor"
-  white2000_2$Species[white2000_2$Species == "Prunus pensylvannica"] <- "Prunus pensylvanica"
-  white2000_2$Species <- gsub("Abiea", "Abies",  white2000_2$Species)
-  white2000_2 <- white2000_2[!(white2000_2$Species == "ENF"), ]
-  white2000_2[white2000_2 == -999] <- NA
-  white2000_2[, c("Labile", "Cellulose", "Lignin")] <- white2000_2[, c("Labile", "Cellulose", "Lignin")]/100
-  white2000_2 <- prepWhite2000Table(white2000_2, value.var = c("Labile", "Cellulose", "Lignin"))
-  names(white2000_2) <- c(
-    "taxa",
-    "fineRootLabileProportion",
-    "litterLabileProportion",
-    "fineRootCelluloseProportion",
-    "litterCelluloseProportion",
-    "fineRootLigninProportion",
-    "litterLigninProportion",
-    "level")
-  # If there are proportions for all but one component, infer the missing proportion (e.g.,prop3 = 1-(prop1+prop2))
-  white2000_2 <- fillMissingEPCProportions(white2000_2, pools = c("fineRoot", "litter"))
-  white2000 <- merge(white2000_1, white2000_2, by = c("taxa", "level"), all = TRUE)
-  
-  # White 2000 table 3
-  white2000_3 <- prepInputs(targetFile = "White_spreadsheet3.csv", 
-                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
-                            destinationPath = destinationPath,
-                            fun = "data.table::fread",
-                            check.names = TRUE)
-  white2000_3$Species[white2000_3$Species == "Pinus elliotii"] <- "Pinus elliottii"
-  white2000_3$Species[white2000_3$Species == "Pinus Taeda"] <- "Pinus taeda"
-  white2000_3$Species[white2000_3$Species == "Robinea pseudoacacia"] <- "Robinia pseudoacacia"
-  white2000_3[white2000_3 == -999] <- NA # These are incorrect
-  # except for the lines with NAs, the column are mixed-up
-  white2000_3[!is.na(white2000_3$Cellulose), c("Lignin", "Cellulose")] <-  white2000_3[!is.na(white2000_3$Cellulose), c("Cellulose", "Lignin")]
-  white2000_3[, c("Lignin", "Cellulose")] <- white2000_3[, c("Lignin", "Cellulose")]/100 
-  white2000_3 <- prepWhite2000Table(white2000_3, value.var = c("Lignin", "Cellulose"))
-  names(white2000_3) <- c(
-    "taxa",
-    "deadWoodLigninProportion",
-    "deadWoodCelluloseProportion",
-    "level")
-  white2000_3 <- fillMissingEPCProportions(white2000_3, pools = "deadWood")
-  white2000 <- merge(white2000, white2000_3, by = c("taxa", "level"), all = TRUE)
-  
-  # White 2000 table 4
-  white2000_4 <- prepInputs(targetFile = "White_spreadsheet4.csv", 
-                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
-                            destinationPath = destinationPath,
-                            fun = "data.table::fread",
-                            check.names = TRUE)
-  white2000_4[white2000_4 == -999] <- NA
-  white2000_4 <- prepWhite2000Table(white2000_4, value.var = c("Initial", "Final"))
-  names(white2000_4) <- c(
-    "taxa",
-    "initialLeafWaterPotential",
-    "finalLeafWaterPotential",
-    "level"
-  )
-  white2000 <- merge(white2000, white2000_4, by = c("taxa", "level"), all = TRUE)
-  
-  # White 2000 table 5
-  white2000_5 <- prepInputs(targetFile = "White_spreadsheet5.csv", 
-                            url = "https://drive.google.com/file/d/1xVNwNenJRXtBKDTmpxMutS7Ipd5NSeWK/view?usp=drive_link", 
-                            destinationPath = destinationPath,
-                            fun = "data.table::fread",
-                            check.names = TRUE)
-  white2000_5[,c("Initial", "Final")] <- white2000_5[,c("Initial", "Final")] * 1000 # from kPa to Pa
-  white2000_5 <- prepWhite2000Table(white2000_5, value.var = c("Initial", "Final"))
-  names(white2000_5) <- c(
-    "taxa",
-    "initialVaporPressureDeficit",
-    "finalVaporPressureDeficit",
-    "level"
-  )
-  white2000 <- merge(white2000, white2000_5, by = c("taxa", "level"), all = TRUE)
-  
-  epc <- rbindlist(list(epc, white2000), fill = TRUE)
-  # check that the sums of proportions equal to 1
-  epc <- scaleEPCProportions(epc)
-  # Get the correct epc for the species in sppEquiv
-  epc <- getEPC(epc, sppEquiv)
-  epc <- cleanEPC(epc)
-  # Write the species-level epcs in the destinationPath/epc folder
-  apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
   return(epc)
 }
 

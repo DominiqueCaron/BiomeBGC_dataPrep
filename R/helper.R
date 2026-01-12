@@ -7,9 +7,7 @@
 # metWrite
 # CO2Read
 # CO2Write
-# assertEPCproportions
 # initiateEPC
-# getEPC
 # lccToAlbedo
 
 #### EPC helper functions ####
@@ -266,39 +264,6 @@ initiateEPC <- function() {
       finalVaporPressureDeficit = numeric()
     )
   )
-}
-
-# Get the ecophysiological constants for species in sppEquiv. Starts by retrieving
-# species-level epc, then tries genus-level, and finally plant functional type level.
-getEPC <- function(epcTable, sppEquiv){
-  epcSpecies <- epcTable[level == "Species"]
-  epcGenus <- epcTable[level == "Genus", ]
-  epcPFT <- epcTable[level == "pft", ]
-  epc_cols <- colnames(epcTable[,-c(1,2)])
-  res <- as.data.table(sppEquiv)
-  
-  # 1. Species-level traits
-  res <- merge(res, epcSpecies, by.x = "species", by.y = "taxa", all.x = TRUE)
-  
-  # 2. Genus-level (adds trait.genus)
-  res <- merge(res, epcGenus, by.x = "genus", by.y = "taxa", all.x = TRUE, suffixes = c("", "_genus"))
-  
-  # 3. PFT-level (adds trait.pft)
-  res <- merge(res, epcPFT, by.x = "PFT", by.y = "taxa", all.x = TRUE, suffixes = c("", "_pft"))
-  
-  for (col in epc_cols) {
-    res[, (col) := fifelse(!is.na(get(col)), 
-                           get(col), 
-                           fifelse(!is.na(get(paste0(col, "_genus"))),
-                                   get(paste0(col, "_genus")),
-                                   get(paste0(col, "_pft"))
-                           )
-    )
-    ]
-  }
-  cols <- c("speciesId", "species", epc_cols)
-  res <- res[ , ..cols]
-  return(res)
 }
 
 #### MET helper functions ####
