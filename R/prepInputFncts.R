@@ -61,20 +61,39 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
     overwrite = TRUE,
     url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    cropTo = to,
+    projectTo = to,
     destinationPath = destinationPath,
-    to = to,
     fun = "terra::rast"
-  ) |> round()
+  )
+  # reprojecting can create holes
+  w <- sum(is.na(values(Ndeposition1))) / 250
+  if (w != 0){
+    w <- round(w/2) * 2 + 1
+    Ndeposition1 <- focal(Ndeposition1, w = w, fun = 'mean', na.policy = 'only')
+  }
+  # mask to study area
+  Ndeposition1 <- maskTo(Ndeposition1, to) |> round()
+  
+  # N deposition for the second time step
   Ndeposition2 <- prepInputs(
     targetFile = paste0("mean_totN_", year2, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
     overwrite = TRUE,
     url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    projectTo = to,
     destinationPath = destinationPath,
-    to = to,
     fun = "terra::rast"
-  ) |> round()
-  Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) # convert from kg/ha/yr to kg/m2/yr
+  )
+  # fill the holes
+  if (w != 0){
+    Ndeposition2 <- focal(Ndeposition2, w = w, fun = 'mean', na.policy = 'only')
+  }
+  # mask to study area
+  Ndeposition2 <- maskTo(Ndeposition2, to) |> round()
+  
+  # convert from kg/ha/yr to kg/m2/yr
+  Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) 
   names(Ndeposition) <- as.character(c(year1, year2))
   
   return(Ndeposition)
@@ -254,7 +273,6 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
 
 # Extract elevation raster
 prepElevation <- function(studyArea, to){
-  
   # get data from Amazon Web Services Terrain Tiles
   elevation <-  get_elev_raster(
     locations = sf::st_as_sf(studyArea),
@@ -267,6 +285,6 @@ prepElevation <- function(studyArea, to){
     to = to
   )
   
-  # round to 10m
-  return(round(elevation, -1))
+  # round to the nearest 50m
+  return(50 * round(elevation/50))
 }
