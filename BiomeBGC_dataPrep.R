@@ -23,10 +23,6 @@ defineModule(sim, list(
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
                   "RNCan/BioSimClient_R", "geosphere"),
   parameters = bindrows(
-    defineParameter("annualOutput", "numeric", c(545, 636, 637, 638, 639, 307), NA, NA, 
-                    paste("The indices of the daily output variable(s) requested.",
-                          "There are >500 possible variables.")
-    ),
     defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA, 
                     paste("11-number vector for initial carbon conditions:",
                           "1: peak leaf carbon to be attained during the first simulation year (kgC/m2)",
@@ -57,10 +53,6 @@ defineModule(sim, list(
                           "concentration trajectories and meteorological data.",
                           "Either 'RCP45' or 'RCP85'.")
     ),
-    defineParameter("dailyOutput", "numeric", c(20, 21, 38, 40, 42, 43, 44, 70, 509, 528, 620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639, 579), NA, NA, 
-                    paste("The indices of the daily output variable(s) requested.",
-                          "There are >500 possible variables.")
-    ),
     defineParameter("maxSpinupYears", "integer", 6000L, NA, NA, 
                     paste("The maximum number of simulation for a spinup run.")
     ),
@@ -77,6 +69,13 @@ defineModule(sim, list(
                     paste("2-number vector for initial nitrogen conditions:",
                           "1: litter nitrogen associated with labile litter carbon pool (kgN/m2)",
                           "2: soil mineral nitrogen pool (kgN/m2)")
+    ),
+    defineParameter("outputVariables", "numeric", c(620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639), NA, NA, 
+                    paste("The indices of the daily output variable(s) requested.",
+                          "There are >500 possible variables and are listed here:",
+                          "https://raw.githubusercontent.com/PredictiveEcology/BiomeBGCR/refs/heads/development/src/Biome-BGC/src/bgclib/output_map_init.c.",
+                          "The units of each variable are found here:",
+                          "https://raw.githubusercontent.com/PredictiveEcology/BiomeBGCR/refs/heads/development/src/Biome-BGC/src/include/bgc_struct.h.")
     ),
     defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, NA, NA, NA), NA, NA, 
                     paste("A vector with site information:",
@@ -372,31 +371,20 @@ prepareSpinupIni <- function(sim) {
                           1)) # for on-screen progress indicator
   
   # Set DAILY_OUTPUT section
-  nDailyOutput <- length(P(sim)$dailyOutput)
+  nDailyOutput <- length(P(sim)$outputVariables)
   # Rewrite, it is easier given that the size of the section varies
   iniTemplate[["DAILY_OUTPUT"]] <- rbind(iniTemplate[["DAILY_OUTPUT"]][1, ],
                                          c(nDailyOutput, "(int)", "number of daily variables to output"))
   iniTemplate[["DAILY_OUTPUT"]] <- rbind(
     iniTemplate[["DAILY_OUTPUT"]],
     data.frame(
-      value = P(sim)$dailyOutput,
+      value = P(sim)$outputVariables,
       unit = c(0:(nDailyOutput -
                     1)),
-      comment = getOutputDescription(P(sim)$dailyOutput)
+      comment = getOutputDescription(P(sim)$outputVariables)
     )
   )
   
-  # Set ANNUAL_OUTPUT section
-  nAnnOutput <- length(P(sim)$annualOutput)
-  # Rewrite, it is easier given that the size of the section varies
-  iniTemplate[["ANNUAL_OUTPUT"]] <- rbind(iniTemplate[["ANNUAL_OUTPUT"]][1, ],
-                                          c(nAnnOutput, "(int)", "number of annual output variables"))
-  iniTemplate[["ANNUAL_OUTPUT"]] <- rbind(iniTemplate[["ANNUAL_OUTPUT"]],
-                                          data.frame(
-                                            value = P(sim)$annualOutput,
-                                            unit = c(0:(nAnnOutput-1)),
-                                            comment = getOutputDescription(P(sim)$annualOutput)
-                                          ))
   # Create a list of ini files: 1 file per pixelGroup
   bbgcSpinup.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
     # First read the ini template
@@ -575,8 +563,8 @@ prepareIni <- function(sim) {
     ini <- iniSet(ini, "OUTPUT_CONTROL", 2:6, c(
       1, # 1 = write daily output   0 = no daily output
       1, # 1 = monthly avg of daily variables  0 = no monthly avg
-      1, # 1 = annual avg of daily variables   0 = no annual avg
-      1, # 1 = write annual output  0 = no annual output
+      0, # 1 = annual avg of daily variables   0 = no annual avg
+      0, # 1 = write annual output  0 = no annual output
       1  # for on-screen progress indicator
     )) 
     

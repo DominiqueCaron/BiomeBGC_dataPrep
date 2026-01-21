@@ -35,19 +35,54 @@ prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, m
 }
 
 # Extract % of sand, % of clay and % of silt from CanSIS dataset
+# Takes the average across layers 0-30cm
 prepSoilTexture <- function(destinationPath, to){
-  sand <- prepInputs(
+  ## Sand %
+  # layer 0-5 cm
+  sand0_5 <- prepInputs(
+    url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X0_5_cm_100m1980-2000v1.tif",
+    targetFile = "Sand_X0_5_cm_100m1980-2000v1.tif",
+    destinationPath = destinationPath,
+    to = to
+  ) |> Cache()
+  sand5_15 <- prepInputs(
+    url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X5_15_cm_100m1980-2000v1.tif",
+    targetFile = "Sand_X5_15_cm_100m1980-2000v1.tif",
+    destinationPath = destinationPath,
+    to = to
+  ) |> Cache()
+  sand15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) |> round(digits = -1)
-  clay <- prepInputs(
+  ) |> Cache()
+  
+  sand <- round((5/30) * sand0_5 + (10/30) * sand5_15 + (15/30) * sand15_30, digit = -1)
+  
+  clay0_5 <- prepInputs(
+    url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X0_5_cm_100m1980-2000v1.tif",
+    targetFile = "Clay_X0_5_cm_100m1980-2000v1.tif",
+    destinationPath = destinationPath,
+    to = to
+  ) 
+  
+  clay5_15 <- prepInputs(
+    url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X5_15_cm_100m1980-2000v1.tif",
+    targetFile = "Clay_X5_15_cm_100m1980-2000v1.tif",
+    destinationPath = destinationPath,
+    to = to
+  ) 
+  
+  clay15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) |> round(digits = -1)
+  ) 
+  
+  clay <- round((5/30) * clay0_5 + (10/30) * clay5_15 + (15/30) * clay15_30, digit = -1)
+  
   silt <- 100 - (sand + clay)
   soilTexture <- c(sand, silt, clay)
   names(soilTexture) <- c("sand", "silt", "clay")
