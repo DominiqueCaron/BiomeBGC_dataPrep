@@ -65,21 +65,21 @@ prepSoilTexture <- function(destinationPath, to){
     targetFile = "Clay_X0_5_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) 
+  ) |> Cache()
   
   clay5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X5_15_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) 
+  ) |> Cache()
   
   clay15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
     to = to
-  ) 
+  ) |> Cache()
   
   clay <- round((5/30) * clay0_5 + (10/30) * clay5_15 + (15/30) * clay15_30, digit = -1)
   
