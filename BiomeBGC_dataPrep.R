@@ -696,7 +696,7 @@ prepareIni <- function(sim) {
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
     }
     sim$NfixationRates <- postProcessTo(sim$NfixationRates,
-                                        to = sim$rasterToMatch)
+                                        to = sim$rasterToMatch) |> Cache()
     
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }

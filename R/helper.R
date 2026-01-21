@@ -383,7 +383,7 @@ getOutputDescription <- function(outputId){
   
   outputTbl <- data.table(
     output_id = as.integer(sub(".*\\[([^]]+)\\].*", "\\1", name_lines)),
-    output_name = sub(".*&([^->]+)->([^;]+);.*", "\\1.\\2", name_lines)
+    output_name = sub(".*->([^;]+);.*", "\\1", name_lines)
   )
   
   out <- outputTbl[match(outputId, outputTbl$output_id)]$output_name
