@@ -102,10 +102,15 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     fun = "terra::rast"
   )
   # reprojecting can create holes
-  w <- sum(is.na(values(Ndeposition1))) / 250
-  if (w != 0){
-    w <- round(w/2) * 2 + 1
+  w <- sum(is.na(values(Ndeposition1)))
+  while (w != 0){
+    w <- round(w/4)
+    # make sure w is a odd number
+    if(w %% 2 != 1){
+      w = w+1
+    }
     Ndeposition1 <- focal(Ndeposition1, w = w, fun = 'mean', na.policy = 'only')
+    w <- sum(is.na(values(Ndeposition1)))
   }
   # mask to study area
   Ndeposition1 <- maskTo(Ndeposition1, to) |> round()
@@ -121,8 +126,15 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     fun = "terra::rast"
   )
   # fill the holes
-  if (w != 0){
+  w <- sum(is.na(values(Ndeposition2)))
+  while (w != 0){
+    w <- round(w/4)
+    # make sure w is a odd number
+    if(w %% 2 != 1){
+      w = w+1
+    }
     Ndeposition2 <- focal(Ndeposition2, w = w, fun = 'mean', na.policy = 'only')
+    w <- sum(is.na(values(Ndeposition2)))
   }
   # mask to study area
   Ndeposition2 <- maskTo(Ndeposition2, to) |> round()
@@ -135,10 +147,14 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
 }
 
 # Get the albedo per land cover
-rvestAlbedoTable <- function(){
+rvestAlbedoTable <- function(destinationPath){
   
   # extract Table 1 of Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
-  GaoEtAl2005 <- read_html("http://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2004JD005190")
+  url <- "http://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2004JD005190"
+  tmpfile <- file.path(destinationPath, "tmp.html")
+  download.file(url, destfile = tmpfile, quiet = TRUE)
+  GaoEtAl2005 <- read_html(tmpfile)
+  file.remove(tmpfile)
   tables <- GaoEtAl2005 %>% html_table(fill = TRUE)
   table1 <- tables[[1]]
   
@@ -199,7 +215,8 @@ prepEPC <- function(url, sppEquiv, destinationPath){
                     url = url, 
                     destinationPath = destinationPath,
                     fun = "data.table::fread",
-                    check.names = TRUE)
+                    check.names = TRUE,
+                    overwrite = TRUE)
   
   # keep only the lines for the species in study
   epc <- epc[epc$speciesId %in% sppEquiv$speciesId, ]
