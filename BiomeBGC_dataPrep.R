@@ -329,7 +329,6 @@ preparePixelGroups <- function(sim) {
     sim$pixelGroupParameters[,  ..cols],
     by = "pixelGroup"
   ) |> na.omit()
-  
   setkey(sim$pixelGroupParameters, pixelGroup)
   setcolorder(sim$pixelGroupParameters, "pixelGroup")
   
@@ -436,7 +435,7 @@ prepareSpinupIni <- function(sim) {
     
     # Latitude
     if (is.na(P(sim)$siteConstants[6])) {
-      spinupIni <- iniSet(spinupIni, "SITE", 6, parameters$elevation)
+      spinupIni <- iniSet(spinupIni, "SITE", 6, parameters$latitude)
     } else {
       spinupIni <- iniSet(spinupIni, "SITE", 6, P(sim)$siteConstants[6])
     }
@@ -562,7 +561,7 @@ prepareIni <- function(sim) {
     ini <- iniSet(ini, "OUTPUT_CONTROL", 1, fileName)
     ini <- iniSet(ini, "OUTPUT_CONTROL", 2:6, c(
       1, # 1 = write daily output   0 = no daily output
-      1, # 1 = monthly avg of daily variables  0 = no monthly avg
+      0, # 1 = monthly avg of daily variables  0 = no monthly avg
       0, # 1 = annual avg of daily variables   0 = no annual avg
       0, # 1 = write annual output  0 = no annual output
       1  # for on-screen progress indicator
@@ -696,7 +695,7 @@ prepareIni <- function(sim) {
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
     }
     sim$NfixationRates <- postProcessTo(sim$NfixationRates,
-                                        to = sim$rasterToMatch) |> Cache()
+                                        to = sim$rasterToMatch)
     
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }
@@ -739,7 +738,7 @@ prepareIni <- function(sim) {
       to = sim$rasterToMatch,
       method = "near"
     ) |> Cache()
-    albedoTable <- rvestAlbedoTable()
+    albedoTable <- rvestAlbedoTable(dPath)
     sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, sim$rasterToMatch)
   }
   
