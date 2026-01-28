@@ -21,7 +21,7 @@ defineModule(sim, list(
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
   reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/LandR@development",
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
-                  "RNCan/BioSimClient_R", "geosphere"),
+                  "RNCan/BioSimClient_R", "geosphere", "ggpubr"),
   parameters = bindrows(
     defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA, 
                     paste("11-number vector for initial carbon conditions:",
@@ -70,7 +70,7 @@ defineModule(sim, list(
                           "1: litter nitrogen associated with labile litter carbon pool (kgN/m2)",
                           "2: soil mineral nitrogen pool (kgN/m2)")
     ),
-    defineParameter("outputVariables", "numeric", c(620, 621, 622, 623, 624, 625, 626, 627, 636, 637, 638, 639), NA, NA, 
+    defineParameter("outputVariables", "numeric", c(0, 3, 545, 641, 44, 620, 621), NA, NA, 
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables and are listed here:",
                           "https://raw.githubusercontent.com/PredictiveEcology/BiomeBGCR/refs/heads/development/src/Biome-BGC/src/bgclib/output_map_init.c.",
@@ -228,35 +228,32 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
       
       sim <- prepareIni(sim)
       
-      # schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "BiomeBGC_dataPrep", "plot")
-      sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "BiomeBGC_dataPrep", "save")
+      # schedule plotting
+      if (anyPlotting(P(sim)$.plots)) sim <- scheduleEvent(sim, end(sim), "BiomeBGC_dataPrep", "plot", eventPriority = 12)
     },
     plot = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
+      browser()
+      # Will save in a common BiomeBGC folder
+      figPath <- file.path(outputPath(sim), "BiomeBGC_figures")
       
-      plotFun(sim) # example of a plotting function
-      # schedule future event(s)
+      # Climate plot
+      metPlot <- climatePlot(sim$meteorologicalData) 
       
-      # e.g.,
-      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "BiomeBGC_dataPrep", "plot")
+      SpaDES.core::Plots(metPlot,
+                         filename = "climatePlot",
+                         path = figPath,
+                         ggsaveArgs = list(width = 14, height = 5, units = "in", dpi = 300),
+                         types = "png")
       
-      # ! ----- STOP EDITING ----- ! #
-    },
-    save = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
       
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
+      # Raster of the climate polygon
+      SpaDES.core::Plots(sim$climatePolygons,
+                         filename = "climatePolygons",
+                         fn = climatePolygonMap,
+                         path = figPath,
+                         deviceArgs = list(width = 7, height = 7, units = "in", res = 300),
+                         types = "png")
       
-      # schedule future event(s)
-      
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "BiomeBGC_dataPrep", "save")
-      
-      # ! ----- STOP EDITING ----- ! #
     },
     warning(noEventWarning(sim))
   )
@@ -274,20 +271,8 @@ Save <- function(sim) {
   return(invisible(sim))
 }
 
-### template for plot events
-plotFun <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
 preparePixelGroups <- function(sim) {
-  if("ECODISTRIC" %in% names(sim$climatePolygons)){
-    field <- "ECODISTRIC"
-  } else {
-    field <- ""
-  }
+  field <- "climatePolygonId"
   dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
   latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
   speciesNames <- cats(sim$dominantSpecies)[[1]]$category
@@ -322,7 +307,6 @@ preparePixelGroups <- function(sim) {
   
   sim$pixelGroupMap <- copy(sim$rasterToMatch)
   values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
-  values(sim$pixelGroupMap)[is.na(sim$pixelGroupParameters$dominantSpecies)] <- NA
   
   cols <- c(cols, "pixelGroup")
   sim$pixelGroupParameters <- unique(
@@ -331,6 +315,8 @@ preparePixelGroups <- function(sim) {
   ) |> na.omit()
   setkey(sim$pixelGroupParameters, pixelGroup)
   setcolorder(sim$pixelGroupParameters, "pixelGroup")
+  
+  values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA 
   
   return(invisible(sim))
 }
@@ -561,10 +547,10 @@ prepareIni <- function(sim) {
     ini <- iniSet(ini, "OUTPUT_CONTROL", 1, fileName)
     ini <- iniSet(ini, "OUTPUT_CONTROL", 2:6, c(
       1, # 1 = write daily output   0 = no daily output
-      0, # 1 = monthly avg of daily variables  0 = no monthly avg
-      0, # 1 = annual avg of daily variables   0 = no annual avg
+      1, # 1 = monthly avg of daily variables  0 = no monthly avg
+      1, # 1 = annual avg of daily variables   0 = no annual avg
       0, # 1 = write annual output  0 = no annual output
-      1  # for on-screen progress indicator
+      0  # for on-screen progress indicator
     )) 
     
     return(ini)
@@ -573,6 +559,47 @@ prepareIni <- function(sim) {
   sim$bbgc.ini <- bbgc.ini
   
   return(invisible(sim))
+}
+
+climatePlot <- function(metData) {
+  pal <- rainbow(n = length(metData))
+  
+  # for each climate polygon, calculate annual precipitation, and average temperature
+  metData <- lapply(metData, function(climPolygonData){
+    if(!inherits(climPolygonData, "data.table")) climPolygonData <- as.data.table(climPolygonData)
+    climPolygonData[ ,.(tavg = mean(tday), annPrcp = sum(prcp) * 10), by = year]
+  })
+  
+  # get into a single data.table
+  metData <- rbindlist(metData, idcol = "climatePolygon")
+  
+  TempPlot <- ggplot(metData) +
+    geom_line(aes(x = year, y = tavg, color = climatePolygon), linewidth = 0.75) +
+    labs(x = "Year", y = "Daytime average temperature (°C)", color = "Climate polygon") +
+    theme_bw() +
+    scale_color_manual(values = pal)
+  
+  PrecipPlot <- ggplot(metData) +
+    geom_line(aes(x = year, y = annPrcp, color = climatePolygon), linewidth = 0.75) +
+    labs(x = "Year", y = "Annual precipitation (mm)", color = "Climate polygon") +
+    theme_bw() +
+    scale_color_manual(values = pal)
+  
+  
+  p <- ggpubr::ggarrange(TempPlot, PrecipPlot,  common.legend = TRUE, legend = "right")
+  
+  return(p)
+}
+
+climatePolygonMap <- function(climatePolygons){
+  pal <- rainbow(n = length(climatePolygons))
+  
+  if (!("climatePolygonId" %in% names(climatePolygons))){
+    climatePolygons$climatePolygonId <- c(1:length(climatePolygons))
+  }
+  
+  p <- terra::plot(climatePolygons, "climatePolygonId", col = pal, plg = list(title="Climate polygon"))
+  return(p)
 }
 
 .inputObjects <- function(sim) {
@@ -594,6 +621,8 @@ prepareIni <- function(sim) {
       to = sim$rasterToMatch,
       fun = "terra::vect"
     ) |> Cache()
+    
+    sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
     
   }
   
@@ -695,7 +724,7 @@ prepareIni <- function(sim) {
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
     }
     sim$NfixationRates <- postProcessTo(sim$NfixationRates,
-                                        to = sim$rasterToMatch)
+                                        to = sim$rasterToMatch) |> Cache()
     
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }
