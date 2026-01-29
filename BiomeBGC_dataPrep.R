@@ -714,14 +714,20 @@ climatePolygonMap <- function(climatePolygons){
       url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
       destinationPath = dPath,
       cropTo = sim$rasterToMatch,
-      fun = "terra::rast"
+      fun = "terra::rast",
+      overwrite = TRUE
     ) |> Cache()
     
     # fill holes 
     w <- sum(is.na(values(sim$NfixationRates)))
-    if (w != 0){
-      w <- round(w/2) * 2 + 3
-      sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
+    while (w != 0){
+      w <- round(sqrt(w))
+      # make sure w is a odd number
+      if(w %% 2 != 1){
+        w = w+1
+      }
+      Ndeposition1 <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
+      w <- sum(is.na(values(sim$NfixationRates)))
     }
     sim$NfixationRates <- postProcessTo(sim$NfixationRates,
                                         to = sim$rasterToMatch) |> Cache()
@@ -748,7 +754,8 @@ climatePolygonMap <- function(climatePolygons){
       fun = "terra::rast",
       destinationPath = dPath,
       projectTo = sim$rasterToMatch,
-      maskTo = sim$studyArea
+      maskTo = sim$studyArea,
+      overwrite = TRUE
     ) |> Cache()
     
     # We use the average for January of the first year.
@@ -765,7 +772,8 @@ climatePolygonMap <- function(climatePolygons){
       url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
       destinationPath = dPath,
       to = sim$rasterToMatch,
-      method = "near"
+      method = "near",
+      overwrite = TRUE
     ) |> Cache()
     albedoTable <- rvestAlbedoTable(dPath)
     sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, sim$rasterToMatch)

@@ -21,7 +21,8 @@ prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, m
     cropTo = cropTo,
     projectTo = projectTo,
     maskTo = maskTo,
-    method = method
+    method = method,
+    overwrite = TRUE
   )
   # set 0 to NA
   NAflag(dominantSpecies) <- 0
@@ -110,7 +111,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
   # reprojecting can create holes
   w <- sum(is.na(values(Ndeposition1)))
   while (w != 0){
-    w <- round(w/4)
+    w <- round(sqrt(w))
     # make sure w is a odd number
     if(w %% 2 != 1){
       w = w+1
@@ -134,7 +135,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
   # fill the holes
   w <- sum(is.na(values(Ndeposition2)))
   while (w != 0){
-    w <- round(w/4)
+    w <- round(sqrt(w))
     # make sure w is a odd number
     if(w %% 2 != 1){
       w = w+1
@@ -201,7 +202,8 @@ prepCo2Concentration <- function(firstYear, lastYear, scenario, destinationPath)
       co2Data <- co2Data[, c(1, 4)]
       co2Data
     },
-    destinationPath = destinationPath
+    destinationPath = destinationPath,
+    overwrite = TRUE
   ) |> Cache()
   yearToKeep <- firstYear <= co2concentrations[,1] & co2concentrations[,1] <= lastYear
   co2concentrations <- co2concentrations[yearToKeep, ]
