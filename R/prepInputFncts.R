@@ -43,19 +43,22 @@ prepSoilTexture <- function(destinationPath, to){
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X0_5_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X0_5_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to
+    to = to,
+    overwrite = TRUE
   ) |> Cache()
   sand5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X5_15_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to
+    to = to,
+    overwrite = TRUE
   ) |> Cache()
   sand15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to
+    to = to,
+    overwrite = TRUE
   ) |> Cache()
   
   sand <- round((5/30) * sand0_5 + (10/30) * sand5_15 + (15/30) * sand15_30, digit = -1)
@@ -64,21 +67,24 @@ prepSoilTexture <- function(destinationPath, to){
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X0_5_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X0_5_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to
+    to = to,
+    overwrite = TRUE
   ) |> Cache()
   
   clay5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X5_15_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to
+    to = to,
+    overwrite = TRUE
   ) |> Cache()
   
   clay15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to
+    to = to,
+    overwrite = TRUE
   ) |> Cache()
   
   clay <- round((5/30) * clay0_5 + (10/30) * clay5_15 + (15/30) * clay15_30, digit = -1)
@@ -237,8 +243,8 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
   lon <- latlon[,1]
   lat <- latlon[,2]
   
-  if ("ECODISTRIC" %in% names(climatePolygons)){
-    id = climatePolygons$ECODISTRIC
+  if ("climatePolygonId" %in% names(climatePolygons)){
+    id = climatePolygons$climatePolygonId
   } else {
     id = c(1:length(climatePolygons))
   }
