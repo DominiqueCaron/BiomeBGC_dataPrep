@@ -232,7 +232,6 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
       if (anyPlotting(P(sim)$.plots)) sim <- scheduleEvent(sim, end(sim), "BiomeBGC_dataPrep", "plot", eventPriority = 12)
     },
     plot = {
-      browser()
       # Will save in a common BiomeBGC folder
       figPath <- file.path(outputPath(sim), "BiomeBGC_figures")
       
@@ -709,9 +708,9 @@ climatePolygonMap <- function(climatePolygons){
   # Default source Reis Ely et al., 2025: https://doi.org/10.1038/s41597-025-05131-4
   if (!suppliedElsewhere('NFixationRates', sim)) {
     sim$NfixationRates <- prepInputs(
-      targetFile = "BNF_total_central_1.tif",
+      targetFile = "BNF_total_central_0.004.tif",
       overwrite = TRUE,
-      url = "https://www.sciencebase.gov/catalog/file/get/66b53cc6d34eebcf8bb3850e?f=__disk__67%2Fdf%2F6a%2F67df6a59f896d547205ddb20da99ec72db7a6b10",
+      url = "https://drive.google.com/file/d/1AVZvcSBPCuDLagfGsfLbeYkmRl5S5G_d/view?usp=sharing",
       destinationPath = dPath,
       cropTo = sim$rasterToMatch,
       fun = "terra::rast",
