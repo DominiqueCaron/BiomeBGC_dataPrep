@@ -178,6 +178,12 @@ defineModule(sim, list(
                  ),
                  sourceURL = "https://climate-scenarios.canada.ca/?page=blended-snow-data"
     ), 
+    expectsInput("soilDepth", "SpatRaster",
+                 desc = paste(
+                   "A raster of effective soil depth (rooting zone depth) in m."
+                 ),
+                 sourceURL = "https://www.earthdata.nasa.gov/data/catalog/ornl-cloud-nacp-mstmip-unified-na-soilmap-1242-1"
+    ), 
     expectsInput("soilTextures", "SpatRaster",
                  desc = paste(
                    "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
@@ -285,6 +291,7 @@ preparePixelGroups <- function(sim) {
     soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
     soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
     soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
+    soilDepth = values(sim$soilDepth) |> as.vector(),
     soilAlbedo = values(sim$shortwaveAlbedo) |> as.vector(),
     NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
     NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
@@ -399,8 +406,14 @@ prepareSpinupIni <- function(sim) {
     
     ## Set SITE section
     # For each check if NA, if it is get the value from different sources
-    # Rooting zone soil depth, if NA set to 1m
-    spinupIni <- iniSet(spinupIni, "SITE", 1, ifelse(is.na(P(sim)$siteConstants[1]), 1, P(sim)$siteConstants[1]))
+    # Soil depth
+    if(is.na(P(sim)$siteConstants[1])){
+      spinupIni <- iniSet(spinupIni, "SITE", 1, 
+                          parameters[, c("soilDepth")])
+    } else {
+      spinupIni <- iniSet(spinupIni, "SITE", 1,
+                          P(sim)$siteConstants[1])
+    }
     
     # Soil texture: % of sand, % of silt, % of clay
     if(is.na(P(sim)$siteConstants[2])){
@@ -680,6 +693,24 @@ climatePolygonMap <- function(climatePolygons){
     ) |> Cache()
   }
   
+  # Soil Depth
+  # Default source: ORNL NACP MsTMIP
+  if (!suppliedElsewhere('soilDepth', sim)) {
+    
+    sim$soilDepth <- prepInputs(
+      targetFile = "Unified_NA_Soil_Map_Maximum_Soil_Depth.tif",
+      overwrite = TRUE,
+      url = "https://drive.google.com/file/d/1XviKnfo1JjVaeVl95Il4Hh7DNZp6IPvn/view?usp=sharing",
+      destinationPath = dPath,
+      to = sim$rasterToMatch,
+      fun = "terra::rast"
+    ) |> Cache()
+    
+    # transfer from cm to m and round to the 0.1 m
+    sim$soilDepth <- sim$soilDepth / 100 |> round(sim$soilDepth, digits = 1)
+    
+  }
+  
   # Elevation raster
   # Default source: Amazon Web Services Terrain Tiles
   if (!suppliedElsewhere('elevation', sim)) {
@@ -713,20 +744,14 @@ climatePolygonMap <- function(climatePolygons){
       url = "https://drive.google.com/file/d/1AVZvcSBPCuDLagfGsfLbeYkmRl5S5G_d/view?usp=sharing",
       destinationPath = dPath,
       cropTo = sim$rasterToMatch,
-      fun = "terra::rast",
-      overwrite = TRUE
+      fun = "terra::rast"
     ) |> Cache()
     
     # fill holes 
     w <- sum(is.na(values(sim$NfixationRates)))
-    while (w != 0){
-      w <- round(sqrt(w))
-      # make sure w is a odd number
-      if(w %% 2 != 1){
-        w = w+1
-      }
-      Ndeposition1 <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
-      w <- sum(is.na(values(sim$NfixationRates)))
+    if (w != 0){
+      w <- round(w/2) * 2 + 3
+      sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
     }
     sim$NfixationRates <- postProcessTo(sim$NfixationRates,
                                         to = sim$rasterToMatch) |> Cache()
