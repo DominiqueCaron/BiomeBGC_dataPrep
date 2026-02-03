@@ -353,20 +353,20 @@ preparePixelGroups <- function(sim) {
     latitudes <- project(crds(sim$studyArea), crs(sim$studyArea), "EPSG:4326")[,2]
     
     sim$pixelGroupParameters <- data.table(
-      pixelIndex = 1:length(sim$studyArea),
-      climatePolygon = extract(sim$climatePolygons, sim$studyArea)[field] |> as.vector(),
+      pixelGroup = 1:length(sim$studyArea),
+      climatePolygon = extract(sim$climatePolygons, sim$studyArea)[field] |> unlist(),
       dominantSpecies = dominantSpecies,
-      soilSandContent = extract(sim$soilTexture$sand, sim$studyArea, ID = FALSE) |> as.vector(),
-      soilClayContent = extract(sim$soilTexture$clay, sim$studyArea, ID = FALSE) |> as.vector(),
-      soilSiltContent = extract(sim$soilTexture$silt, sim$studyArea, ID = FALSE) |> as.vector(),
+      soilSandContent = extract(sim$soilTexture$sand, sim$studyArea, ID = FALSE) |> unlist(),
+      soilClayContent = extract(sim$soilTexture$clay, sim$studyArea, ID = FALSE) |> unlist(),
+      soilSiltContent = extract(sim$soilTexture$silt, sim$studyArea, ID = FALSE) |> unlist(),
       soilDepth = extract(sim$soilDepth, sim$studyArea, ID = FALSE) |> as.vector(),
-      soilAlbedo = extract(sim$shortwaveAlbedo, sim$studyArea, ID = FALSE) |> as.vector(),
-      NdepositionT1 = extract(sim$Ndeposition[[1]], sim$studyArea, ID = FALSE) |> as.vector(),
+      soilAlbedo = extract(sim$shortwaveAlbedo, sim$studyArea, ID = FALSE) |> unlist(),
+      NdepositionT1 = extract(sim$Ndeposition[[1]], sim$studyArea, ID = FALSE) |> unlist(),
       NdepositionT2 = extract(sim$Ndeposition[[2]], sim$studyArea, ID = FALSE) |> as.vector(),
-      NfixationRate = extract(sim$NfixationRates, sim$studyArea, ID = FALSE) |> as.vector(),
-      elevation = extract(sim$elevation, sim$studyArea, ID = FALSE) |> as.vector(),
+      NfixationRate = extract(sim$NfixationRates, sim$studyArea, ID = FALSE) |> unlist(),
+      elevation = extract(sim$elevation, sim$studyArea, ID = FALSE) |> unlist(),
       latitude = round(latitudes, 1),
-      snowPackWaterContent = extract(sim$snowpackWaterContent, sim$studyArea, ID = FALSE) |> as.vector()
+      snowPackWaterContent = extract(sim$snowpackWaterContent, sim$studyArea, ID = FALSE) |> unlist()
     ) 
     
     sim$pixelGroupMap <- rasterize(sim$studyArea, sim$dominantSpecies)
