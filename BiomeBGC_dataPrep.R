@@ -279,52 +279,98 @@ Save <- function(sim) {
 
 preparePixelGroups <- function(sim) {
   field <- "climatePolygonId"
-  dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
-  latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
-  speciesNames <- cats(sim$dominantSpecies)[[1]]$category
-  dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
-  sim$pixelGroupParameters <- data.table(
-    pixelIndex = 1:ncell(sim$rasterToMatch),
-    climatePolygon = values(
-      rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)
-    ) |> as.vector(),
-    dominantSpecies = dominantSpeciesInPixels,
-    soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
-    soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
-    soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
-    soilDepth = values(sim$soilDepth) |> as.vector(),
-    soilAlbedo = values(sim$shortwaveAlbedo) |> as.vector(),
-    NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
-    NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
-    NfixationRate = values(sim$NfixationRates) |> as.vector(),
-    elevation = values(sim$elevation) |> as.vector(),
-    latitude = round(latitudes, 1),
-    snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
-  ) 
-  nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
-  sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
   
-  cols <- setdiff(names(sim$pixelGroupParameters), "pixelIndex")
+  # tag if studyArea is a point vector
+  SAisPolygon <- geomtype(sim$studyArea) == "polygons"
   
-  sim$pixelGroupParameters[, "pixelGroup"] <- LandR::generatePixelGroups(
-    sim$pixelGroupParameters,
-    maxPixelGroup = 0,
-    columns = cols
-  )
-  
-  sim$pixelGroupMap <- copy(sim$rasterToMatch)
-  values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
-  
-  cols <- c(cols, "pixelGroup")
-  sim$pixelGroupParameters <- unique(
-    sim$pixelGroupParameters[,  ..cols],
-    by = "pixelGroup"
-  ) |> na.omit()
-  setkey(sim$pixelGroupParameters, pixelGroup)
-  setcolorder(sim$pixelGroupParameters, "pixelGroup")
-  
-  values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA 
-  
+  if (SAisPolygon){
+    # if the studyArea is a polygon, extract values for each cell
+    dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
+    latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
+    speciesNames <- cats(sim$dominantSpecies)[[1]]$category
+    dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
+    sim$pixelGroupParameters <- data.table(
+      pixelIndex = 1:ncell(sim$rasterToMatch),
+      climatePolygon = values(
+        rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)
+      ) |> as.vector(),
+      dominantSpecies = dominantSpeciesInPixels,
+      soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
+      soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
+      soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
+      soilDepth = values(sim$soilDepth) |> as.vector(),
+      soilAlbedo = values(sim$shortwaveAlbedo) |> as.vector(),
+      NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
+      NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
+      NfixationRate = values(sim$NfixationRates) |> as.vector(),
+      elevation = values(sim$elevation) |> as.vector(),
+      latitude = round(latitudes, 1),
+      snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
+    ) 
+    nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
+    sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
+    
+    cols <- setdiff(names(sim$pixelGroupParameters), "pixelIndex")
+    
+    sim$pixelGroupParameters[, "pixelGroup"] <- LandR::generatePixelGroups(
+      sim$pixelGroupParameters,
+      maxPixelGroup = 0,
+      columns = cols
+    )
+    
+    sim$pixelGroupMap <- copy(sim$rasterToMatch)
+    values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
+    
+    cols <- c(cols, "pixelGroup")
+    sim$pixelGroupParameters <- unique(
+      sim$pixelGroupParameters[,  ..cols],
+      by = "pixelGroup"
+    ) |> na.omit()
+    setkey(sim$pixelGroupParameters, pixelGroup)
+    setcolorder(sim$pixelGroupParameters, "pixelGroup")
+    
+    values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA 
+    
+  } else {
+    # if the studyArea is points, extract values for each point
+    dominantSpecies <- extract(sim$dominantSpecies, sim$studyArea)
+    
+    # If points falls in a non-treed pixel, find the closest pixel with a leading species
+    i <- 1
+    dominantSpeciesRast <- sim$dominantSpecies
+    while (any(is.na(dominantSpecies[,2])) | i < 3){
+      message("The study area falls in a non-treed pixel, using the leading species of close pixels.")
+      message("Using distance: ", i, "cells.")
+      dominantSpeciesRast <- focal(dominantSpeciesRast, w = 3, fun = "modal", na.policy = "only")
+      dominantSpecies <- extract(dominantSpeciesRast, sim$studyArea)
+      i <- i + 1
+    }
+    if(any(is.na(dominantSpecies[,2]))) {
+      stop("The study area is further than 3 pixels from a treed pixel. Verify your inputs.")
+    }
+    speciesNames <- cats(sim$dominantSpecies)[[1]]$category
+    dominantSpecies <- speciesNames[dominantSpecies[,2]]
+    latitudes <- project(crds(sim$studyArea), crs(sim$studyArea), "EPSG:4326")[,2]
+    
+    sim$pixelGroupParameters <- data.table(
+      pixelIndex = 1:length(sim$studyArea),
+      climatePolygon = extract(sim$climatePolygons, sim$studyArea)[field] |> as.vector(),
+      dominantSpecies = dominantSpecies,
+      soilSandContent = extract(sim$soilTexture$sand, sim$studyArea, ID = FALSE) |> as.vector(),
+      soilClayContent = extract(sim$soilTexture$clay, sim$studyArea, ID = FALSE) |> as.vector(),
+      soilSiltContent = extract(sim$soilTexture$silt, sim$studyArea, ID = FALSE) |> as.vector(),
+      soilDepth = extract(sim$soilDepth, sim$studyArea, ID = FALSE) |> as.vector(),
+      soilAlbedo = extract(sim$shortwaveAlbedo, sim$studyArea, ID = FALSE) |> as.vector(),
+      NdepositionT1 = extract(sim$Ndeposition[[1]], sim$studyArea, ID = FALSE) |> as.vector(),
+      NdepositionT2 = extract(sim$Ndeposition[[2]], sim$studyArea, ID = FALSE) |> as.vector(),
+      NfixationRate = extract(sim$NfixationRates, sim$studyArea, ID = FALSE) |> as.vector(),
+      elevation = extract(sim$elevation, sim$studyArea, ID = FALSE) |> as.vector(),
+      latitude = round(latitudes, 1),
+      snowPackWaterContent = extract(sim$snowpackWaterContent, sim$studyArea, ID = FALSE) |> as.vector()
+    ) 
+    
+    sim$pixelGroupMap <- rasterize(sim$studyArea, sim$dominantSpecies)
+  }
   return(invisible(sim))
 }
 
@@ -640,7 +686,7 @@ climatePolygonMap <- function(climatePolygons){
   } else if (geomtype(sim$studyArea) == "points"){
     
     # Used to crop/mask/project the inputs
-    polyTo <- buffer(sim$studyArea, 10^5)
+    polyTo <- buffer(sim$studyArea, 10^4)
     rstTo <- terra::rast(polyTo, res = res(sim$rastertoMatch))
     values(rstTo) <- 1
     
@@ -759,7 +805,7 @@ climatePolygonMap <- function(climatePolygons){
     
     sim$elevation <- prepElevation(
       studyArea = sim$studyArea,
-      to = sim$rasterToMatch
+      to = rstTo
     ) |> Cache()
     
   }
