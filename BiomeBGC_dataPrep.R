@@ -170,7 +170,8 @@ defineModule(sim, list(
     ), 
     expectsInput("rasterToMatch", "SpatRaster", 
                  desc = paste("A raster defining the extent, resolution, projection of the",
-                              "study area.")
+                              "study area. The user needs to provide the rasterToMatch if",
+                              "the studyArea is a polygon.")
     ),
     expectsInput("snowpackWaterContent", "SpatRaster",
                  desc = paste(
@@ -617,9 +618,36 @@ climatePolygonMap <- function(climatePolygons){
 .inputObjects <- function(sim) {
   dPath <- asPath(inputPath(sim), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
+  
   # Study area needs to be either points or a polygon
   if (!suppliedElsewhere('studyArea', sim)) {
+    
     stop("studyArea must be provided.")
+    
+  }
+  
+  # Check that the studyArea is either a SpatVector polygon or point
+  if (geomtype(sim$studyArea) == "polygons"){
+    
+    if (!suppliedElsewhere('rasterToMatch', sim)) {
+      
+      stop("Please provide a rasterToMatch when studyArea is a polygon.")
+      rstTo <- sim$rastertoMatch
+      polyTo <- sim$studyArea
+      
+    }
+    
+  } else if (geomtype(sim$studyArea) == "points"){
+    
+    # Used to crop/mask/project the inputs
+    polyTo <- buffer(sim$studyArea, 10^5)
+    rstTo <- terra::rast(polyTo, res = res(sim$rastertoMatch))
+    values(rstTo) <- 1
+    
+  } else {
+    
+    stop("studyArea must be a SpatVector polygon or points")
+    
   }
   
   # Climate polygons: Climate is assumed to be homogeneous within polygons
@@ -630,9 +658,17 @@ climatePolygonMap <- function(climatePolygons){
       targetFile = "ecodistricts.shp",
       url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/district/ecodistrict_shp.zip",
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      cropTo = rstTo,
+      projectTo = rstTo,
       fun = "terra::vect"
     ) |> Cache()
+    
+    # if using points as studyArea, only keeps the polygons containing the points
+    if (geomtype(sim$studyArea) == "points"){
+      rel <- terra::relate(sim$climatePolygons, sim$studyArea, relation="intersects")
+      poly_indices <- which(rowSums(rel) > 0)
+      sim$climatePolygons <- sim$climatePolygons[poly_indices, ]
+    }
     
     sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
     
@@ -641,18 +677,22 @@ climatePolygonMap <- function(climatePolygons){
   # Dominant species layer
   # Default source: NTEMS dominant species layer for the 1st year of simulation
   if (!suppliedElsewhere('dominantSpecies', sim)) {
+    
     yearToUse <- max(min(start(sim), 2022), 1984)
+    
     if (yearToUse != start(sim)){
       message("NTEMS dominant species layer is not available for ", start(sim), 
               ", using layer for ", yearToUse)
     }
+    
     sim$dominantSpecies <- prepNTEMSDominantSpecies(
       year = yearToUse,
       destinationPath = dPath,
-      cropTo = sim$rasterToMatch,
-      projectTo = sim$rasterToMatch,
-      maskTo = sim$studyArea
+      cropTo = rstTo,
+      projectTo = rstTo,
+      maskTo = polyTo
     ) |> Cache()
+    
   }
   
   # Table to link the dominant species to traits of White et al., 2000
@@ -687,10 +727,12 @@ climatePolygonMap <- function(climatePolygons){
   # Default sources: CanSIS Soil Landscape Grids of Canada
   # Using the 15-30cm depth layer
   if (!suppliedElsewhere('soilTexture', sim)) {
+    
     sim$soilTexture <- prepSoilTexture(
       destinationPath = dPath,
-      to = sim$rasterToMatch
+      to = rstTo
     ) |> Cache()
+    
   }
   
   # Soil Depth
@@ -702,12 +744,12 @@ climatePolygonMap <- function(climatePolygons){
       overwrite = TRUE,
       url = "https://drive.google.com/file/d/1XviKnfo1JjVaeVl95Il4Hh7DNZp6IPvn/view?usp=sharing",
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      to = rstTo,
       fun = "terra::rast"
     ) |> Cache()
     
     # transfer from cm to m and round to the 0.1 m
-    sim$soilDepth <- sim$soilDepth / 100 |> round(sim$soilDepth, digits = 1)
+    sim$soilDepth <- sim$soilDepth / 100 |> round(digits = 1)
     
   }
   
@@ -729,7 +771,7 @@ climatePolygonMap <- function(climatePolygons){
     year2 <- min(end(sim), 2020)
     sim$Ndeposition <-  prepNdeposition(
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      to = rstTo,
       year1 = year1,
       year2 = year2
     ) |> Cache()
@@ -743,18 +785,23 @@ climatePolygonMap <- function(climatePolygons){
       overwrite = TRUE,
       url = "https://drive.google.com/file/d/1AVZvcSBPCuDLagfGsfLbeYkmRl5S5G_d/view?usp=sharing",
       destinationPath = dPath,
-      cropTo = sim$rasterToMatch,
+      cropTo = rstTo,
       fun = "terra::rast"
     ) |> Cache()
     
     # fill holes 
     w <- sum(is.na(values(sim$NfixationRates)))
-    if (w != 0){
-      w <- round(w/2) * 2 + 3
+    while (w != 0){
+      w <- round(sqrt(w))
+      # make sure w is a odd number
+      if(w %% 2 != 1){
+        w = w+1
+      }
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
+      w <- sum(is.na(values(sim$NfixationRates)))
     }
     sim$NfixationRates <- postProcessTo(sim$NfixationRates,
-                                        to = sim$rasterToMatch) |> Cache()
+                                        to = rstTo) |> Cache()
     
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }
@@ -777,8 +824,9 @@ climatePolygonMap <- function(climatePolygons){
       url = "https://climate-scenarios.canada.ca/files/blended_snow_2024/swe_monthly_mm_1981-2020.zip",
       fun = "terra::rast",
       destinationPath = dPath,
-      projectTo = sim$rasterToMatch,
-      maskTo = sim$studyArea,
+      cropTo = rstTo,
+      projectTo = rstTo,
+      maskTo = polyTo,
       overwrite = TRUE
     ) |> Cache()
     
@@ -795,12 +843,12 @@ climatePolygonMap <- function(climatePolygons){
     lcc <- prepInputs(
       url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
       destinationPath = dPath,
-      to = sim$rasterToMatch,
+      to = rstTo,
       method = "near",
       overwrite = TRUE
     ) |> Cache()
     albedoTable <- rvestAlbedoTable(dPath)
-    sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, sim$rasterToMatch)
+    sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, rstTo)
   }
   
   # Meteorological data
@@ -817,6 +865,7 @@ climatePolygonMap <- function(climatePolygons){
       climModel = P(sim)$climModel,
       destinationPath= dPath
     )|> Cache()
+    
   }
   
   # CO2 atmospheric concentration
