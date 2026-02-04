@@ -381,7 +381,7 @@ prepareSpinupIni <- function(sim) {
   ## Set TIME_DEFINE section
   iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 1, P(sim)$metSpinupYears) # number of year in the metdata
   iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 2, P(sim)$metSpinupYears) # number of simulation years
-  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 3, start(sim)) #first simulation year
+  iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 3, start(sim) - P(sim)$metSpinupYears) #first simulation year
   iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 4, 1) # 1 = spinup, 0 = normal simulation
   iniTemplate <- iniSet(iniTemplate, "TIME_DEFINE", 5, P(sim)$maxSpinupYears) # max spinup years
   
@@ -584,7 +584,7 @@ prepareIni <- function(sim) {
     
     # Change the TIME_DEFINE section
     nyear <- length(unique(sim$meteorologicalData[[1]]$year))
-    ini <- iniSet(ini, "TIME_DEFINE", 1, nyear) # number of year in the metdata
+    ini <- iniSet(ini, "TIME_DEFINE", 1, end(sim) - start(sim) + 1) # number of year in the metdata
     ini <- iniSet(ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1) # number of simulation years
     ini <- iniSet(ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
     ini <- iniSet(ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
@@ -904,9 +904,9 @@ climatePolygonMap <- function(climatePolygons){
     sim$meteorologicalData <- prepClimate(
       climatePolygons = sim$climatePolygons,
       siteName = P(sim)$siteNames,
-      firstYear = start(sim),
-      lastYear = end(sim),
-      lastSpinupYear = start(sim) + P(sim)$metSpinupYears,
+      simStartYear = start(sim),
+      simEndYear = end(sim),
+      nSpinupYears = P(sim)$metSpinupYears,
       scenario = P(sim)$co2scenario,
       climModel = P(sim)$climModel,
       destinationPath= dPath

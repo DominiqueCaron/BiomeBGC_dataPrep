@@ -236,7 +236,7 @@ prepEPC <- function(url, sppEquiv, destinationPath){
 }
 
 # Extract the meteorological data
-prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpinupYear, scenario, climModel, destinationPath){
+prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
@@ -251,11 +251,14 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
     id = c(1:length(climatePolygons))
   }
   
+  # define the first year to extract climate
+  firstYear <- simStartYear - nSpinupYears
+  
   # get climate from BioSim
   climate <- generateWeather(
     modelNames = c("Climatic_Daily", "VaporPressureDeficit_Daily"),
     fromYr = firstYear,
-    toYr = lastYear,
+    toYr = simEndYear,
     id = id,
     latDeg = lat,
     longDeg = lon,
@@ -269,6 +272,7 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
   for (i in id) {
     climate_i <- lapply(climate, FUN = function(x){
       x <- x[x$KeyID == i, ]
+      # BiomeBGC do not simulate Feb 29 (always 365 day/yr)
       x <- x[x$Month != 2 | x$Day != 29,]
       x
     })
@@ -285,7 +289,7 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
       vpd = climate_i[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
       srad = climate_i[["Climatic_Daily"]]$SRad,
       daylen = daylen,
-      spinup = climate_i[["Climatic_Daily"]]$Year <= lastSpinupYear
+      spinup = climate_i[["Climatic_Daily"]]$Year < simStartYear
     )
     
     spinupFileName <- tolower(paste0(
@@ -312,7 +316,7 @@ prepClimate <- function(climatePolygons, siteName, firstYear, lastYear, lastSpin
       scenario,
       "_",
       firstYear,
-      lastYear,
+      simEndYear,
       ".mtc43"
     ))
     fileName <- file.path(destinationPath, "metdata", fileName)
