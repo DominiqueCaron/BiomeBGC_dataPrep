@@ -315,14 +315,14 @@ prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSp
       climModel,
       scenario,
       "_",
-      firstYear,
+      simStartYear,
       simEndYear,
       ".mtc43"
     ))
     fileName <- file.path(destinationPath, "metdata", fileName)
     
     metWrite(
-      metData = climate_i[, c(1:10)],
+      metData = climate_i[!climate_i$spinup, c(1:10)],
       fileName = fileName,
       siteName  = paste0("Climate Polygon: ", i),
       dataSource = paste(climModel, scenario, sep = ": ")

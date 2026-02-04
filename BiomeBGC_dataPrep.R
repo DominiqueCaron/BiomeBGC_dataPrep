@@ -10,7 +10,6 @@ defineModule(sim, list(
   keywords = "",
   authors = c(
     person("Dominique", "Caron", email = "dominique.caron@nrcan-rncan.gc.ca", role = c("aut", "cre")),
-    person(c("Alex", "M."), "Chubaty", email = "achubaty@for-cast.ca", role = "aut"),
     person("Céline", "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = "ctb")
   ),
   childModules = character(0),
@@ -285,10 +284,15 @@ preparePixelGroups <- function(sim) {
   
   if (SAisPolygon){
     # if the studyArea is a polygon, extract values for each cell
-    dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
+    if (inherits(sim$dominantSpecies, "SpatRaster")){
+      dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
+      speciesNames <- cats(sim$dominantSpecies)[[1]]$category
+      dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
+    } else {
+      dominantSpeciesInPixels <- sim$dominantSpecies
+    }
+    
     latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
-    speciesNames <- cats(sim$dominantSpecies)[[1]]$category
-    dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
     sim$pixelGroupParameters <- data.table(
       pixelIndex = 1:ncell(sim$rasterToMatch),
       climatePolygon = values(
@@ -332,24 +336,30 @@ preparePixelGroups <- function(sim) {
     values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA 
     
   } else {
-    # if the studyArea is points, extract values for each point
-    dominantSpecies <- extract(sim$dominantSpecies, sim$studyArea)
-    
-    # If points falls in a non-treed pixel, find the closest pixel with a leading species
-    i <- 1
-    dominantSpeciesRast <- sim$dominantSpecies
-    while (any(is.na(dominantSpecies[,2])) | i < 3){
-      message("The study area falls in a non-treed pixel, using the leading species of close pixels.")
-      message("Using distance: ", i, "cells.")
-      dominantSpeciesRast <- focal(dominantSpeciesRast, w = 3, fun = "modal", na.policy = "only")
-      dominantSpecies <- extract(dominantSpeciesRast, sim$studyArea)
-      i <- i + 1
+    # dominant species
+    if (inherits(sim$dominantSpecies, "SpatRaster")){
+      # if the studyArea is points, extract values for each point
+      dominantSpecies <- extract(sim$dominantSpecies, sim$studyArea)
+      
+      # If points falls in a non-treed pixel, find the closest pixel with a leading species
+      i <- 1
+      dominantSpeciesRast <- sim$dominantSpecies
+      while (any(is.na(dominantSpecies[,2])) | i < 3){
+        message("The study area falls in a non-treed pixel, using the leading species of close pixels.")
+        message("Using distance: ", i, "cells.")
+        dominantSpeciesRast <- focal(dominantSpeciesRast, w = 3, fun = "modal", na.policy = "only")
+        dominantSpecies <- extract(dominantSpeciesRast, sim$studyArea)
+        i <- i + 1
+      }
+      if(any(is.na(dominantSpecies[,2]))) {
+        stop("The study area is further than 3 pixels from a treed pixel. Verify your inputs.")
+      }
+      speciesNames <- cats(sim$dominantSpecies)[[1]]$category
+      dominantSpecies <- speciesNames[dominantSpecies[,2]]
+    } else {
+      dominantSpecies <- sim$dominantSpecies
     }
-    if(any(is.na(dominantSpecies[,2]))) {
-      stop("The study area is further than 3 pixels from a treed pixel. Verify your inputs.")
-    }
-    speciesNames <- cats(sim$dominantSpecies)[[1]]$category
-    dominantSpecies <- speciesNames[dominantSpecies[,2]]
+      
     latitudes <- project(crds(sim$studyArea), crs(sim$studyArea), "EPSG:4326")[,2]
     
     sim$pixelGroupParameters <- data.table(
@@ -369,7 +379,7 @@ preparePixelGroups <- function(sim) {
       snowPackWaterContent = extract(sim$snowpackWaterContent, sim$studyArea, ID = FALSE) |> unlist()
     ) 
     
-    sim$pixelGroupMap <- rasterize(sim$studyArea, sim$dominantSpecies)
+    sim$pixelGroupMap <- rasterize(sim$studyArea, sim$soilTexture$sand)
   }
   return(invisible(sim))
 }
@@ -753,8 +763,12 @@ climatePolygonMap <- function(climatePolygons){
       genus = sppEquiv$genus,
       PFT = sppEquiv$PFT
     )
-    speciesIdInStudyArea <- unique(values(sim$dominantSpecies)) |> na.omit()
-    speciesInStudyArea <- cats(sim$dominantSpecies)[[1]][speciesIdInStudyArea,"category"]
+    if (inherits(sim$dominantSpecies, "SpatRaster")){
+      speciesIdInStudyArea <- unique(values(sim$dominantSpecies)) |> na.omit()
+      speciesInStudyArea <- cats(sim$dominantSpecies)[[1]][speciesIdInStudyArea,"category"]
+    } else {
+      speciesInStudyArea <- sim$dominantSpecies
+    }
     sim$sppEquiv <- sppEquiv[match(speciesInStudyArea, sppEquiv$speciesId),]
   }
   
