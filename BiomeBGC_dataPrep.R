@@ -688,10 +688,11 @@ climatePolygonMap <- function(climatePolygons){
     if (!suppliedElsewhere('rasterToMatch', sim)) {
       
       stop("Please provide a rasterToMatch when studyArea is a polygon.")
+    
+    } else {
       rstTo <- sim$rastertoMatch
       polyTo <- sim$studyArea
-      
-    }
+    }      
     
   } else if (geomtype(sim$studyArea) == "points"){
     
