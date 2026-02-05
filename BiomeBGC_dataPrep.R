@@ -690,7 +690,7 @@ climatePolygonMap <- function(climatePolygons){
       stop("Please provide a rasterToMatch when studyArea is a polygon.")
     
     } else {
-      rstTo <- sim$rastertoMatch
+      rstTo <- sim$rasterToMatch
       polyTo <- sim$studyArea
     }      
     
