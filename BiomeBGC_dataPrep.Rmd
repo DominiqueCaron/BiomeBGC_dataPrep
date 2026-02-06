@@ -1,108 +1,78 @@
 ---
-title: "BiomeBGC_dataPrep Manual"
-subtitle: "v.`r SpaDES.core::moduleMetadata(module = 'BiomeBGC_dataPrep', path = '..')$version`"
-date: "Last updated: `r Sys.Date()`"
+title: "BiomeBGC_dataPrep"
+author: 
+  - Dominique Caron
+  - Céline Boisvenue
+date: "February 2026"
 output:
-  bookdown::html_document2:
-    toc: true
-    toc_float: true
-    theme: sandstone
-    number_sections: false
-    df_print: paged
+  html_document:
     keep_md: yes
+bibliography: citation.bib
 editor_options:
   chunk_output_type: console
-bibliography: citations/references_BiomeBGC_dataPrep.bib
-link-citations: true
-always_allow_html: true
 ---
 
-# BiomeBGC_dataPrep Module
-
-<!-- the following are text references used in captions for LaTeX compatibility -->
-(ref:BiomeBGC-dataPrep) *BiomeBGC_dataPrep*
-
-```{r setup-BiomeBGC-dataPrep, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, eval = FALSE, results = "hold") ## change to eval = TRUE if all chunks are to be evaluated
-
-dir.create("figures", showWarnings = FALSE)
-
-download.file(url = "https://img.shields.io/badge/Made%20with-Markdown-1f425f.png",
-              destfile = "figures/markdownBadge.png",
-              mode = "wb")
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE, results = "hold", message = FALSE)
 ```
 
-[![made-with-Markdown](figures/markdownBadge.png)](https://commonmark.org)
+# Overview
 
-<!-- if knitting to pdf remember to add the pandoc_args: ["--extract-media", "."] option to yml in order to get the badge images -->
+Retrieves and prepares the input to run Biome-BGC version 4.2 through the module `BiomeBGC_core`.
 
-#### Authors:
+# Parameters
 
-`r paste(as.character(SpaDES.core::moduleMetadata(module = "BiomeBGC_dataPrep", path = '..')$authors), sep = ', ')`
-<!-- ideally separate authors with new lines, '\n' not working -->
+Provide a summary of user-visible parameters.
 
-## Module Overview
-
-### Module summary
-
-Provide a brief summary of what the module does / how to use the module.
-
-Module documentation should be written so that others can use your module.
-This is a template for module documentation, and should be changed to reflect your module.
-
-### Module inputs and parameters
-
-Describe input data required by the module and how to obtain it (e.g., directly from online sources or supplied by other modules)
-If `sourceURL` is specified, `downloadData("BiomeBGC_dataPrep", "C:/Users/docaron/Documents/repos")` may be sufficient.
-
-Table \@ref(tab:moduleInputs-BiomeBGC-dataPrep) shows the full list of module inputs.
-
-```{r moduleInputs-BiomeBGC-dataPrep, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
-df_inputs <- SpaDES.core::moduleInputs("BiomeBGC_dataPrep", "C:/Users/docaron/Documents/repos")
-knitr::kable(df_inputs,
-             caption = "List of (ref:BiomeBGC-dataPrep) input objects and their description.") |>
-  kableExtra::kable_styling(latex_options = "scale_down", full_width = TRUE)
+```{r moduleParams, echo = FALSE, eval = TRUE}
+df_params <- SpaDES.core::moduleParams("BiomeBGC_dataPrep", "..")
+knitr::kable(df_params)
 ```
 
-Summary of user-visible parameters (Table \@ref(tab:moduleParams-BiomeBGC-dataPrep))
-
-
-```{r moduleParams-BiomeBGC-dataPrep, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
-df_params <- SpaDES.core::moduleParams("BiomeBGC_dataPrep", "C:/Users/docaron/Documents/repos")
-knitr::kable(df_params, caption = "List of (ref:BiomeBGC-dataPrep) parameters and their description.") |>
-  kableExtra::kable_styling(latex_options = "scale_down", full_width = TRUE)
-```
-
-### Events
+# Events
 
 Describe what happens for each event type.
 
-### Plotting
+## Plotting
 
 Write what is plotted.
 
-### Saving
+## Saving
 
 Write what is saved.
 
-### Module outputs
+# Data dependencies
 
-Description of the module outputs (Table \@ref(tab:moduleOutputs-BiomeBGC-dataPrep)).
+## Input data
 
-```{r moduleOutputs-BiomeBGC-dataPrep, echo = FALSE, eval = TRUE, message = FALSE, warning = FALSE}
-df_outputs <- SpaDES.core::moduleOutputs("BiomeBGC_dataPrep", "C:/Users/docaron/Documents/repos")
-knitr::kable(df_outputs, caption = "List of (ref:BiomeBGC-dataPrep) outputs and their description.") |>
-  kableExtra::kable_styling(latex_options = "scale_down", full_width = TRUE)
+Input data are parameters driving Biome-BGC. The default input data are from various sources, scale, and precision level. We calibrated default ecophysiological constants for Canadian tree species by aggregating data from @white_parameterization_2000, @hessl_ecophysiological_2004, and TRY plant Trait database [kattge_try_2020]. Meteorological data are retrieved through the BioSIM package [@fortin_web_2022, @fortin_package_2022]. Site-level parameters are extracted from the various sources:
+
+- Dominant species: NTEMS dominant species layers for the 1st year of the simulation [@hermosilla_characterizing_2024].
+- Elevation: AWS Open Data Terrain Tiles extracted with the elevatr package [@hollister_elevatr_2025].
+- N deposition: Extracted from @zhu_changing_2025.
+- N fixation rate: Extracted from @reis_ely_global_2025.
+- Snow pack water content: Canada monthly snow water equivalent (SWE) for January [@mudryk_characterization_2015].
+- Soil depth: The maximum soil depth layer of NACP MsTMIP: Unified North American Soil Map [@liu_north_2014].
+- Soil texture: Soil Landscape Grids of Canada [@geng_100_2025].
+
+
+```{r moduleInputs, echo = FALSE, eval = TRUE}
+df_inputs <- SpaDES.core::moduleInputs("BiomeBGC_dataPrep", "..")
+knitr::kable(df_inputs)
 ```
 
-### Links to other modules
+## Output data
 
-Describe any anticipated linkages to other modules, such as modules that supply input data or do post-hoc analysis.
+Description of the module outputs.
 
-### Getting help
+```{r moduleOutputs, echo = FALSE, eval = TRUE}
+df_outputs <- SpaDES.core::moduleOutputs("BiomeBGC_dataPrep", "..")
+knitr::kable(df_outputs)
+```
 
--   provide a way for people to obtain help (e.g., module repository issues page)
+# Links to other modules
 
-## References
+Prepares inputs for `BiomeBGC_core`.
 
-<!-- autogenerated from bibligraphy -->
+# References
+
