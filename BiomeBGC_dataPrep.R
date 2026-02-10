@@ -401,7 +401,7 @@ prepareSpinupIni <- function(sim) {
   ## Set CO2_CONTROL section
   # TODO: make sure that co2 is always constant for the spinup. If so, which year?
   iniTemplate <- iniSet(iniTemplate, "CO2_CONTROL", 1, 0) # Constant co2 concentration during spinup
-  iniTemplate <- iniSet(iniTemplate, "CO2_CONTROL", 2, sim$CO2concentration[sim$CO2concentration$year == start(sim), "co2_ppm"])
+  iniTemplate <- iniSet(iniTemplate, "CO2_CONTROL", 2, sim$CO2concentration[sim$CO2concentration$year == (start(sim)-P(sim)$metSpinupYears), "co2_ppm"])
   
   # Set C_STATE section
   iniTemplate <- iniSet(iniTemplate, "C_STATE", 1:11, P(sim)$carbonState)
@@ -709,7 +709,6 @@ climatePolygonMap <- function(climatePolygons){
   # Climate polygons: Climate is assumed to be homogeneous within polygons
   # Default source: Canadian ecodistrict
   if (!suppliedElsewhere('climatePolygons', sim)) {
-    
     sim$climatePolygons <- prepInputs(
       targetFile = "ecodistricts.shp",
       url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/district/ecodistrict_shp.zip",
@@ -718,15 +717,17 @@ climatePolygonMap <- function(climatePolygons){
       projectTo = rstTo,
       fun = "terra::vect"
     ) |> Cache()
+    sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
     
     # if using points as studyArea, only keeps the polygons containing the points
     if (geomtype(sim$studyArea) == "points"){
       rel <- terra::relate(sim$climatePolygons, sim$studyArea, relation="intersects")
       poly_indices <- which(rowSums(rel) > 0)
       sim$climatePolygons <- sim$climatePolygons[poly_indices, ]
+    } else {
+      sim$climatePolygons <- maskTo(sim$climatePolygons, maskTo = polyTo)
     }
     
-    sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
     
   }
   
