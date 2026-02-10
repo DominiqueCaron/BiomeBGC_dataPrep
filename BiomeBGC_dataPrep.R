@@ -18,7 +18,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
-  reqdPkgs = list("PredictiveEcology/SpaDES.core@box (>= 2.1.8.9013)", "ggplot2", "PredictiveEcology/LandR@development",
+  reqdPkgs = list("PredictiveEcology/SpaDES.core (>= 3.0.4)", "ggplot2", "PredictiveEcology/LandR@development",
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
                   "RNCan/BioSimClient_R", "geosphere", "ggpubr"),
   parameters = bindrows(
@@ -359,7 +359,7 @@ preparePixelGroups <- function(sim) {
     } else {
       dominantSpecies <- sim$dominantSpecies
     }
-      
+    
     latitudes <- project(crds(sim$studyArea), crs(sim$studyArea), "EPSG:4326")[,2]
     
     sim$pixelGroupParameters <- data.table(
@@ -581,7 +581,7 @@ prepareIni <- function(sim) {
       P(sim)$climModel,
       P(sim)$co2scenario,
       "_",
-      start(sim),
+      start(sim)-P(sim)$metSpinupYears,
       end(sim),
       ".mtc43"
     ))
@@ -594,14 +594,14 @@ prepareIni <- function(sim) {
     
     # Change the TIME_DEFINE section
     nyear <- length(unique(sim$meteorologicalData[[1]]$year))
-    ini <- iniSet(ini, "TIME_DEFINE", 1, end(sim) - start(sim) + 1) # number of year in the metdata
-    ini <- iniSet(ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1) # number of simulation years
-    ini <- iniSet(ini, "TIME_DEFINE", 3, start(sim)) #first simulation year
+    ini <- iniSet(ini, "TIME_DEFINE", 1, end(sim) - start(sim) + 1 + P(sim)$metSpinupYears) # number of year in the metdata
+    ini <- iniSet(ini, "TIME_DEFINE", 2, end(sim) - start(sim) + 1 + P(sim)$metSpinupYears) # number of simulation years
+    ini <- iniSet(ini, "TIME_DEFINE", 3, start(sim) - P(sim)$metSpinupYears) #first simulation year
     ini <- iniSet(ini, "TIME_DEFINE", 4, 0) # 1 = spinup, 0 = normal simulation
     
     # Change the CO2 section
     fileName <- paste("co2",
-                      start(sim),
+                      start(sim)-P(sim)$metSpinupYears,
                       end(sim),
                       paste0(P(sim)$co2scenario, ".txt"),
                       sep = "_")
@@ -674,7 +674,6 @@ climatePolygonMap <- function(climatePolygons){
 .inputObjects <- function(sim) {
   dPath <- asPath(inputPath(sim), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
-  
   # Study area needs to be either points or a polygon
   if (!suppliedElsewhere('studyArea', sim)) {
     
@@ -688,11 +687,11 @@ climatePolygonMap <- function(climatePolygons){
     if (!suppliedElsewhere('rasterToMatch', sim)) {
       
       stop("Please provide a rasterToMatch when studyArea is a polygon.")
-    
+      
     } else {
       rstTo <- sim$rasterToMatch
       polyTo <- sim$studyArea
-    }      
+    }
     
   } else if (geomtype(sim$studyArea) == "points"){
     
@@ -935,7 +934,7 @@ climatePolygonMap <- function(climatePolygons){
   if (!suppliedElsewhere('CO2concentration', sim)) {
     
     sim$CO2concentration <- prepCo2Concentration(
-      firstYear = start(sim),
+      firstYear = start(sim)-P(sim)$metSpinupYears,
       lastYear = end(sim),
       scenario = P(sim)$co2scenario,
       destinationPath= dPath

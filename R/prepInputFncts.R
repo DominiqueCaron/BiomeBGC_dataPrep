@@ -224,7 +224,8 @@ prepEPC <- function(url, sppEquiv, destinationPath){
                     destinationPath = destinationPath,
                     fun = "data.table::fread",
                     check.names = TRUE,
-                    overwrite = TRUE)
+                    overwrite = TRUE,
+                    purge = 7)
   
   # keep only the lines for the species in study
   epc <- epc[epc$speciesId %in% sppEquiv$speciesId, ]
@@ -237,6 +238,7 @@ prepEPC <- function(url, sppEquiv, destinationPath){
 
 # Extract the meteorological data
 prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
+  
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
@@ -315,14 +317,14 @@ prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSp
       climModel,
       scenario,
       "_",
-      simStartYear,
+      firstYear,
       simEndYear,
       ".mtc43"
     ))
     fileName <- file.path(destinationPath, "metdata", fileName)
     
     metWrite(
-      metData = climate_i[!climate_i$spinup, c(1:10)],
+      metData = climate_i[, c(1:10)],
       fileName = fileName,
       siteName  = paste0("Climate Polygon: ", i),
       dataSource = paste(climModel, scenario, sep = ": ")
