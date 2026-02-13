@@ -365,7 +365,7 @@ lccToAlbedo <- function(lcc, albedoTable, rasterToMatch){
   
   
   albedo <- albedoTable[cbind(rowIds, colIds)]
-  
+  albedo[is.na(albedo)] <- 0.1
   out <- lcc
   values(out) <- round(as.numeric(albedo), digits = 2)
   

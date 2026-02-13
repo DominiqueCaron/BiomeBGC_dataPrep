@@ -828,8 +828,8 @@ climatePolygonMap <- function(climatePolygons){
   # Total N deposition
   # Default source: Zhu et al., 2025: https://doi.org/10.1038/s41467-024-55606-y
   if (!suppliedElsewhere('Ndeposition', sim)) {
-    year1 <- max(start(sim), 2008)
-    year2 <- min(end(sim), 2020)
+    year1 <- min(max(start(sim), 2008), 2020)
+    year2 <- max(min(end(sim), 2020), 2008)
     sim$Ndeposition <-  prepNdeposition(
       destinationPath = dPath,
       to = rstTo,
@@ -904,7 +904,8 @@ climatePolygonMap <- function(climatePolygons){
     lcc <- prepInputs(
       url = "https://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/SCANFI/v1/SCANFI_att_nfiLandCover_SW_2020_v1.2.tif",
       destinationPath = dPath,
-      to = rstTo,
+      projectTo = rstTo,
+      maskTo = polyTo,
       method = "near",
       overwrite = TRUE
     ) |> Cache()
