@@ -836,6 +836,7 @@ climatePolygonMap <- function(climatePolygons){
       year1 = year1,
       year2 = year2
     ) |> Cache()
+    names(sim$Ndeposition) <- c(max(start(sim), 2008), min(end(sim), 2020))
   }
   
   # Total N fixation rates
