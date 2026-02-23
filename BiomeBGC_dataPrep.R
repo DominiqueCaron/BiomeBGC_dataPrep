@@ -18,7 +18,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
-  reqdPkgs = list("PredictiveEcology/SpaDES.core (>= 3.0.4)", "ggplot2", "PredictiveEcology/LandR@development",
+  reqdPkgs = list("PredictiveEcology/SpaDES.core (>= 3.0.3)", "ggplot2", "PredictiveEcology/LandR@development",
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
                   "RNCan/BioSimClient_R", "geosphere", "ggpubr"),
   parameters = bindrows(
