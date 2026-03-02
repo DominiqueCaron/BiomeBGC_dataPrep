@@ -20,9 +20,9 @@ defineModule(sim, list(
   documentation = list("NEWS.md", "README.md", "BiomeBGC_dataPrep.Rmd"),
   reqdPkgs = list("PredictiveEcology/SpaDES.core (>= 3.0.3)", "ggplot2", "PredictiveEcology/LandR@development",
                   "PredictiveEcology/BiomeBGCR@development", "elevatr", "terra", "rvest", "data.table",
-                  "RNCan/BioSimClient_R", "geosphere", "ggpubr"),
+                  "RNCan/BioSimClient_R", "geosphere", "ggpubr", "BioSIM"),
   parameters = bindrows(
-    defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA, 
+    defineParameter("carbonState", "numeric", c(0.001, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), NA, NA,
                     paste("11-number vector for initial carbon conditions:",
                           "1: peak leaf carbon to be attained during the first simulation year (kgC/m2)",
                           "2: peak stem carbon to be attained during the first year (kgC/m2)",
@@ -37,62 +37,62 @@ defineModule(sim, list(
                           "11: soil carbon, slowest pool (kgC/m2)"
                     )
     ),
-    defineParameter("climModel", "character", "RCM4", NA, NA, 
+    defineParameter("climModel", "character", "RCM4", NA, NA,
                     paste("A climatic model to extract meteorological data.",
                           "Either 'RCM4', 'GCM4', or 'Hadley'.")
     ),
-    defineParameter("climateChangeOptions", "numeric", c(0, 0, 1, 1, 1), NA, NA, 
+    defineParameter("climateChangeOptions", "numeric", c(0, 0, 1, 1, 1), NA, NA,
                     paste("Entries in the CLIMATE_CHANGE section of the ini file.",
                           "The entries are: offset for Tmax, offset for Tmin",
                           "multiplier for prcp, multiplier for vpd, and muliplier",
                           "for srad.")
     ),
-    defineParameter("co2scenario", "character", "RCP45", NA, NA, 
+    defineParameter("co2scenario", "character", "RCP45", NA, NA,
                     paste("An representative concentration pathway for the co2",
                           "concentration trajectories and meteorological data.",
                           "Either 'RCP45' or 'RCP85'.")
     ),
-    defineParameter("maxSpinupYears", "integer", 6000L, NA, NA, 
+    defineParameter("maxSpinupYears", "integer", 6000L, NA, NA,
                     paste("The maximum number of simulation for a spinup run.")
     ),
-    defineParameter("metSpinupYears", "numeric", 40, NA, NA, 
+    defineParameter("metSpinupYears", "numeric", 40, NA, NA,
                     paste("The number of years used for the spinup.")
     ),
-    defineParameter("NDepositionLevel", "numeric", c(1, NA, NA), NA, NA, 
+    defineParameter("NDepositionLevel", "numeric", c(1, NA, NA), NA, NA,
                     paste("A 3-number vector:",
                           "1) Keep nitrogen deposition level constant (0) or vary according to the time trajectory of CO2 mole fractions (1).",
                           "2) The reference year for N deposition (only used when N-deposition varies).",
                           "3) Industrial N deposition value.")
     ),
-    defineParameter("nitrogenState", "numeric", c(0, 0), NA, NA, 
+    defineParameter("nitrogenState", "numeric", c(0, 0), NA, NA,
                     paste("2-number vector for initial nitrogen conditions:",
                           "1: litter nitrogen associated with labile litter carbon pool (kgN/m2)",
                           "2: soil mineral nitrogen pool (kgN/m2)")
     ),
-    defineParameter("outputVariables", "numeric", c(0, 3, 545, 641, 44, 620, 621), NA, NA, 
+    defineParameter("outputVariables", "numeric", c(0, 3, 545, 641, 44, 620, 621), NA, NA,
                     paste("The indices of the daily output variable(s) requested.",
                           "There are >500 possible variables and are listed here:",
                           "https://raw.githubusercontent.com/PredictiveEcology/BiomeBGCR/refs/heads/development/src/Biome-BGC/src/bgclib/output_map_init.c.",
                           "The units of each variable are found here:",
                           "https://raw.githubusercontent.com/PredictiveEcology/BiomeBGCR/refs/heads/development/src/Biome-BGC/src/include/bgc_struct.h.")
     ),
-    defineParameter("siteConstants", "numeric", c(1, NA, NA, NA, NA, NA, NA, NA, NA), NA, NA, 
+    defineParameter("siteConstants", "numeric", c(NA, NA, NA, NA, NA, NA, NA, NA, NA), NA, NA,
                     paste("A vector with site information:",
                           "1: effective soil depth",
                           "2: sand percentage",
                           "3: silt percentage",
                           "4: clay percentage",
-                          "5: site elevation in meters", 
+                          "5: site elevation in meters",
                           "6: site latitude in decimal degrees",
                           "7: site shortwave albedo",
                           "8: annual rate of atmospheric nitrogen deposition",
                           "9: annual rate of symbiotic+asymbiotic nitrogen fixation",
                           "The non-na constants will be retrieved in various sources.")
     ),
-    defineParameter("siteNames", "character", "site1", NA, NA, 
+    defineParameter("siteNames", "character", "site1", NA, NA,
                     paste("The names of the study sites.")
     ),
-    defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA, 
+    defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA,
                     paste("2-number vector for initial water conditions:",
                           "1: initial snowpack water content (kg/m2)",
                           "2: intial soil water content as a proportion of saturation (DIM)",
@@ -118,11 +118,11 @@ defineModule(sim, list(
                     "Should caching of events or module be used?")
   ),
   inputObjects = bindrows(
-    expectsInput("climatePolygons", "SpatVector", 
+    expectsInput("climatePolygons", "SpatVector",
                  desc = paste("Polygons of homogeneous climate. By default,",
                               "ecodistricts are used.")
     ),
-    expectsInput("CO2concentration", "data.frame", 
+    expectsInput("CO2concentration", "data.frame",
                  desc = paste("CO2 concentration for each year.")
     ),
     expectsInput("dominantSpecies", "SpatRaster",
@@ -130,8 +130,8 @@ defineModule(sim, list(
                    "A raster with the leading tree species (speciesId).",
                    "Use to determine the ecophysiological constants.",
                    "By default, the NTEMS dominant tree species layer for the starting year is used.")
-    ), 
-    expectsInput("ecophysiologicalConstants", "data.frame", 
+    ),
+    expectsInput("ecophysiologicalConstants", "data.frame",
                  desc = paste(
                    "Ecophysiological constants. Columns are speciesId, species, PFT, and",
                    "the ecological constants (see template). By default,",
@@ -145,7 +145,7 @@ defineModule(sim, list(
                  ),
                  sourceURL = "https://registry.opendata.aws/terrain-tiles/"
     ),
-    expectsInput("meteorologicalData", "list", 
+    expectsInput("meteorologicalData", "list",
                  desc = paste("List of data.frames with the meteorological data",
                               "for each climate polygons. The units are `deg C`",
                               "for Tmax, Tmin, and Tday, `cm` for prcp, `Pa` for",
@@ -154,20 +154,20 @@ defineModule(sim, list(
     expectsInput("Ndeposition", "SpatRaster",
                  desc = paste(
                    "Raster(s) of total atmospheric N deposition (kgN/m2/yr).",
-                   "If N deposition is variable two layers need to be provided,", 
+                   "If N deposition is variable two layers need to be provided,",
                    "one for N deposition at the start, of the simulation and a",
-                   "second for N deposition at another timestep. The layer name", 
+                   "second for N deposition at another timestep. The layer name",
                    "of the second raster needs to be the year of the data."
                  ),
                  sourceURL = "https://www.nature.com/articles/s41467-024-55606-y"
-    ), 
+    ),
     expectsInput("NFixationRates", "SpatRaster",
                  desc = paste(
                    "Raster of annual rate of symbiotic + asymbiotic nitrogen fixation (kgN/m2/yr)."
                  ),
                  sourceURL = "https://www.sciencebase.gov/catalog/item/66a97480d34e07a119db3a37"
-    ), 
-    expectsInput("rasterToMatch", "SpatRaster", 
+    ),
+    expectsInput("rasterToMatch", "SpatRaster",
                  desc = paste("A raster defining the extent, resolution, projection of the",
                               "study area. The user needs to provide the rasterToMatch if",
                               "the studyArea is a polygon.")
@@ -177,25 +177,25 @@ defineModule(sim, list(
                    "Initial snowpack water content (kg/m2)."
                  ),
                  sourceURL = "https://climate-scenarios.canada.ca/?page=blended-snow-data"
-    ), 
+    ),
     expectsInput("soilDepth", "SpatRaster",
                  desc = paste(
                    "A raster of effective soil depth (rooting zone depth) in m."
                  ),
                  sourceURL = "https://www.earthdata.nasa.gov/data/catalog/ornl-cloud-nacp-mstmip-unified-na-soilmap-1242-1"
-    ), 
+    ),
     expectsInput("soilTextures", "SpatRaster",
                  desc = paste(
                    "A raster stack with layers representing the % of 'Sand', 'Silt', and 'Clay'.",
                    "The across-layers sum needs to equal to 1 for each pixels."
                  ),
                  sourceURL = "https://sis.agr.gc.ca/cansis/nsdb/psm/index.html"
-    ), 
+    ),
     expectsInput("sppEquiv", "data.frame",
                  desc = paste(
                    "A data frame to link the leading species map to ecophysiological constants.",
                    "The columns are speciesId, species, genus, functional plant type.")
-    ), 
+    ),
     expectsInput("studyArea", "SpatVector",
                  desc = paste("Polygons to use as the study area. Must be supplied by the user.",
                               "One polygon per study site.")
@@ -227,6 +227,10 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
   switch(
     eventType,
     init = {
+      # if there are no treed-pixels, skip all events
+      if (all(is.na(values(sim$dominantSpecies)))) {
+        return(invisible(sim))
+      }
       
       sim <- preparePixelGroups(sim)
       
@@ -242,7 +246,7 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
       figPath <- file.path(outputPath(sim), "BiomeBGC_figures")
       
       # Climate plot
-      metPlot <- climatePlot(sim$meteorologicalData) 
+      metPlot <- climatePlot(sim$meteorologicalData)
       
       SpaDES.core::Plots(metPlot,
                          filename = "climatePlot",
@@ -310,7 +314,7 @@ preparePixelGroups <- function(sim) {
       elevation = values(sim$elevation) |> as.vector(),
       latitude = round(latitudes, 1),
       snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
-    ) 
+    )
     nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
     sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
     
@@ -326,14 +330,14 @@ preparePixelGroups <- function(sim) {
     values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
     
     cols <- c(cols, "pixelGroup")
-    sim$pixelGroupParameters <- unique(
+    sim$pixelGroupParameters<- unique(
       sim$pixelGroupParameters[,  ..cols],
       by = "pixelGroup"
     ) |> na.omit()
     setkey(sim$pixelGroupParameters, pixelGroup)
     setcolorder(sim$pixelGroupParameters, "pixelGroup")
     
-    values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA 
+    values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA
     
   } else {
     # dominant species
@@ -377,7 +381,7 @@ preparePixelGroups <- function(sim) {
       elevation = extract(sim$elevation, sim$studyArea, ID = FALSE) |> unlist(),
       latitude = round(latitudes, 1),
       snowPackWaterContent = extract(sim$snowpackWaterContent, sim$studyArea, ID = FALSE) |> unlist()
-    ) 
+    )
     
     sim$pixelGroupMap <- rasterize(sim$studyArea, sim$soilTexture$sand)
   }
@@ -411,7 +415,7 @@ prepareSpinupIni <- function(sim) {
   
   # Set OUTPUT_CONTROL section
   # TODO make sure this is what we want for the spinup
-  iniTemplate <- iniSet(iniTemplate, "OUTPUT_CONTROL", 2:6, 
+  iniTemplate <- iniSet(iniTemplate, "OUTPUT_CONTROL", 2:6,
                         c(0, # 1 = write daily output   0 = no daily output
                           0, # 1 = monthly avg of daily variables  0 = no monthly avg
                           0, # 1 = annual avg of daily variables   0 = no annual avg
@@ -433,12 +437,21 @@ prepareSpinupIni <- function(sim) {
     )
   )
   
+  # Set RESTART section
+  iniTemplate <- iniSet(iniTemplate, "RESTART", c(1:4), c(0, 1, 0, 0))
+  
+  # Set RAMP_NDEP section: N deposition constant for the spinup
+  iniTemplate <- iniSet(iniTemplate, "RAMP_NDEP", 1, 0)
+  
+  # Set the W_STATE section 
+  iniTemplate <- iniSet(iniTemplate, "W_STATE", 2, P(sim)$waterState[2])
+  
   # Create a list of ini files: 1 file per pixelGroup
-  bbgcSpinup.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
+  nPixelGroups <- nrow(sim$pixelGroupParameters)
+  bbgcSpinup.ini <- lapply(seq_len(nPixelGroups), function(pixelGroup_i){
     # First read the ini template
     spinupIni <- iniTemplate
-    
-    parameters <- sim$pixelGroupParameters[pixelGroup == pixelGroup_i, ]
+    parameters <- sim$pixelGroupParameters[pixelGroup_i, ]
     
     ## Set MET_INPUT section
     fileName <- tolower(paste0(
@@ -454,19 +467,17 @@ prepareSpinupIni <- function(sim) {
                         file.path("inputs", "metdata", fileName))
     
     ## Set RESTART section
-    # TODO: make sure that the
-    spinupIni <- iniSet(spinupIni, "RESTART", c(1:4), c(0, 1, 0, 0))
     spinupIni <- iniSet(spinupIni,
                         "RESTART",
                         c(5, 6),
-                        file.path("inputs", "restart", paste0(pixelGroup_i, ".restart")))
+                        file.path("inputs", "restart", paste0(parameters$pixelGroup, ".restart")))
     
     ## Set SITE section
     # For each check if NA, if it is get the value from different sources
     # Soil depth
     if(is.na(P(sim)$siteConstants[1])){
-      spinupIni <- iniSet(spinupIni, "SITE", 1, 
-                          parameters[, c("soilDepth")])
+      spinupIni <- iniSet(spinupIni, "SITE", 1,
+                          parameters$soilDepth)
     } else {
       spinupIni <- iniSet(spinupIni, "SITE", 1,
                           P(sim)$siteConstants[1])
@@ -474,8 +485,12 @@ prepareSpinupIni <- function(sim) {
     
     # Soil texture: % of sand, % of silt, % of clay
     if(is.na(P(sim)$siteConstants[2])){
-      spinupIni <- iniSet(spinupIni, "SITE", c(2:4), 
-                          parameters[, c("soilSandContent", "soilSiltContent", "soilClayContent")])
+      spinupIni <- iniSet(spinupIni, "SITE", 2,
+                          parameters$soilSandContent)
+      spinupIni <- iniSet(spinupIni, "SITE", 3,
+                          parameters$soilSiltContent)
+      spinupIni <- iniSet(spinupIni, "SITE", 4,
+                          parameters$soilClayContent)
     } else {
       spinupIni <- iniSet(spinupIni, "SITE", c(2:4),
                           P(sim)$siteConstants[c(2:4)])
@@ -532,7 +547,6 @@ prepareSpinupIni <- function(sim) {
     
     # Set RAMP_NDEP section
     # TODO: Make sure that it is always constant during spinup
-    spinupIni <- iniSet(spinupIni, "RAMP_NDEP", 1, 0)
     if(P(sim)$NDeposition[1] == 1 & is.na(P(sim)$NDeposition[2])){
       year2 <- names(sim$Ndeposition[[2]])
       Ndeposition2 <- parameters$NdepositionT2
@@ -556,7 +570,6 @@ prepareSpinupIni <- function(sim) {
     } else {
       spinupIni <- iniSet(spinupIni, "W_STATE", 1, P(sim)$waterState[1])
     }
-    spinupIni <- iniSet(spinupIni, "W_STATE", 2, P(sim)$waterState[2])
     
     return(spinupIni)
   })
@@ -570,9 +583,10 @@ prepareSpinupIni <- function(sim) {
 
 prepareIni <- function(sim) {
   # Start from the spinup ini
-  bbgc.ini <- lapply(sim$pixelGroupParameters$pixelGroup, function(pixelGroup_i){
-    ini <- sim$bbgcSpinup.ini[[as.character(pixelGroup_i)]]
-    parameters <- sim$pixelGroupParameters[pixelGroup == pixelGroup_i, ]
+  nPixelGroups <- nrow(sim$pixelGroupParameters)
+  bbgcSpinup.ini <- lapply(seq_len(nPixelGroups), function(pixelGroup_i){
+    parameters <- sim$pixelGroupParameters[pixelGroup_i, ]
+    ini <- sim$bbgcSpinup.ini[[as.character(parameters$pixelGroup)]]
     
     ## Set MET_INPUT section
     fileName <- tolower(paste0(
@@ -589,8 +603,8 @@ prepareIni <- function(sim) {
     
     # Change the RESTART section
     ini <- iniSet(ini, "RESTART", c(1:4), c(1, 0, 0, 0))
-    ini <- iniSet(ini, "RESTART", 5, file.path("inputs", "restart", paste0(pixelGroup_i, ".restart")))
-    ini <- iniSet(ini, "RESTART", 6, file.path("inputs", "restart", paste0(pixelGroup_i, "_out.restart")))
+    ini <- iniSet(ini, "RESTART", 5, file.path("inputs", "restart", paste0(parameters$pixelGroup, ".restart")))
+    ini <- iniSet(ini, "RESTART", 6, file.path("inputs", "restart", paste0(parameters$pixelGroup, "_out.restart")))
     
     # Change the TIME_DEFINE section
     nyear <- length(unique(sim$meteorologicalData[[1]]$year))
@@ -612,7 +626,7 @@ prepareIni <- function(sim) {
     ini <- iniSet(ini, "RAMP_NDEP", 1, P(sim)$NDepositionLevel[1])
     
     # Change OUTPUT_CONTROL section
-    fileName <- file.path("outputs", paste0(pixelGroup_i, "_out"))
+    fileName <- file.path("outputs", paste0(parameters$pixelGroup, "_out"))
     ini <- iniSet(ini, "OUTPUT_CONTROL", 1, fileName)
     ini <- iniSet(ini, "OUTPUT_CONTROL", 2:6, c(
       1, # 1 = write daily output   0 = no daily output
@@ -620,7 +634,7 @@ prepareIni <- function(sim) {
       1, # 1 = annual avg of daily variables   0 = no annual avg
       0, # 1 = write annual output  0 = no annual output
       0  # for on-screen progress indicator
-    )) 
+    ))
     
     return(ini)
   })
@@ -738,7 +752,7 @@ climatePolygonMap <- function(climatePolygons){
     yearToUse <- max(min(start(sim), 2022), 1984)
     
     if (yearToUse != start(sim)){
-      message("NTEMS dominant species layer is not available for ", start(sim), 
+      message("NTEMS dominant species layer is not available for ", start(sim),
               ", using layer for ", yearToUse)
     }
     
@@ -747,9 +761,15 @@ climatePolygonMap <- function(climatePolygons){
       destinationPath = dPath,
       cropTo = rstTo,
       projectTo = rstTo,
-      maskTo = polyTo
+      maskTo = rstTo
     ) |> Cache()
     
+  }
+  
+  # If there are no pixels with trees, skip.
+  if (all(is.na(values(sim$dominantSpecies)))){
+    message("No treed-pixel in the study area. No simulation will be made by Biome-BGC")
+    return(invisible(sim))
   }
   
   # Table to link the dominant species to traits of White et al., 2000
@@ -851,13 +871,15 @@ climatePolygonMap <- function(climatePolygons){
       fun = "terra::rast"
     ) |> Cache()
     
-    # fill holes 
+    # fill holes
     w <- sum(is.na(values(sim$NfixationRates)))
     while (w != 0){
       w <- round(sqrt(w))
-      # make sure w is a odd number
+      # make sure w is a odd number > than 1
       if(w %% 2 != 1){
-        w = w+1
+        w = w + 1
+      } else if (w == 1){
+        w = w + 2
       }
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
       w <- sum(is.na(values(sim$NfixationRates)))
@@ -899,7 +921,7 @@ climatePolygonMap <- function(climatePolygons){
   }
   
   # Shortwave Albedo
-  # Default source: Based on SCANFI landcover and albedo of land cover type in 
+  # Default source: Based on SCANFI landcover and albedo of land cover type in
   # Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
   if (!suppliedElsewhere('shortwaveAlbedo', sim)) {
     lcc <- prepInputs(
@@ -927,7 +949,7 @@ climatePolygonMap <- function(climatePolygons){
       scenario = P(sim)$co2scenario,
       climModel = P(sim)$climModel,
       destinationPath= dPath
-    )|> Cache()
+    ) |> Cache()
     
   }
   

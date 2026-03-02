@@ -11,7 +11,7 @@
 prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, maskTo, method = "mode"){
   # prepare url and targetFile for prepInput call
   domSppURL <- paste0("https://opendata.nfis.org/downloads/forest_change/CA_Tree_Species_Classification_", year, ".zip")
-  domSppTF <- paste0("CA_Forest_Tree_Species_", year, ".tif")  
+  domSppTF <- paste0("CA_Forest_Tree_Species_", year, ".tif")
   
   # prepInput
   dominantSpecies <- prepInputs(
@@ -147,7 +147,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
   Ndeposition2 <- maskTo(Ndeposition2, to) |> round()
   
   # convert from kg/ha/yr to kg/m2/yr
-  Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000) 
+  Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000)
   names(Ndeposition) <- as.character(c(year1, year2))
   
   return(Ndeposition)
@@ -155,9 +155,8 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
 
 # Get the albedo per land cover
 rvestAlbedoTable <- function(destinationPath){
-  
   # extract Table 1 of Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
-  url <- "http://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2004JD005190"
+  url <- "https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2004JD005190"
   tmpfile <- file.path(destinationPath, "tmp.html")
   download.file(url, destfile = tmpfile, quiet = TRUE)
   GaoEtAl2005 <- read_html(tmpfile)
@@ -219,8 +218,8 @@ prepEPC <- function(url, sppEquiv, destinationPath){
   # create a folder for epc in the destinationPath
   dir.create(file.path(destinationPath, "epc"), showWarnings = FALSE)
   # read epc
-  epc <- prepInputs(targetFile = "defaultEPC.csv", 
-                    url = url, 
+  epc <- prepInputs(targetFile = "defaultEPC.csv",
+                    url = url,
                     destinationPath = destinationPath,
                     fun = "data.table::fread",
                     check.names = TRUE,
