@@ -584,7 +584,7 @@ prepareSpinupIni <- function(sim) {
 prepareIni <- function(sim) {
   # Start from the spinup ini
   nPixelGroups <- nrow(sim$pixelGroupParameters)
-  bbgcSpinup.ini <- lapply(seq_len(nPixelGroups), function(pixelGroup_i){
+  bbgc.ini <- lapply(seq_len(nPixelGroups), function(pixelGroup_i){
     parameters <- sim$pixelGroupParameters[pixelGroup_i, ]
     ini <- sim$bbgcSpinup.ini[[as.character(parameters$pixelGroup)]]
     
