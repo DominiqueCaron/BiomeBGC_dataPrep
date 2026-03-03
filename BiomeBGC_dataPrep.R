@@ -867,12 +867,15 @@ climatePolygonMap <- function(climatePolygons){
       overwrite = TRUE,
       url = "https://drive.google.com/file/d/1AVZvcSBPCuDLagfGsfLbeYkmRl5S5G_d/view?usp=sharing",
       destinationPath = dPath,
-      cropTo = rstTo,
+      to = rstTo,
       fun = "terra::rast"
     ) |> Cache()
     
+    sim$NfixationRates <- postProcessTo(sim$NfixationRates,
+                                        to = rstTo) |> Cache()
+    
     # fill holes
-    w <- sum(is.na(values(sim$NfixationRates)))
+    w <- sum(treedPixels & is.na(values(sim$NfixationRates)))
     while (w != 0){
       w <- round(sqrt(w))
       # make sure w is a odd number > than 1
@@ -884,8 +887,6 @@ climatePolygonMap <- function(climatePolygons){
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
       w <- sum(is.na(values(sim$NfixationRates)))
     }
-    sim$NfixationRates <- postProcessTo(sim$NfixationRates,
-                                        to = rstTo) |> Cache()
     
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }

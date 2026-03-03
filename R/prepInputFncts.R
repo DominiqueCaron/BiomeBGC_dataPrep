@@ -156,22 +156,22 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
 # Get the albedo per land cover
 rvestAlbedoTable <- function(destinationPath){
   # extract Table 1 of Gao et al., 2005 (https://doi.org/10.1029/2004JD005190)
-  url <- "https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2004JD005190"
-  tmpfile <- file.path(destinationPath, "tmp.html")
-  download.file(url, destfile = tmpfile, quiet = TRUE)
-  GaoEtAl2005 <- read_html(tmpfile)
-  file.remove(tmpfile)
-  tables <- GaoEtAl2005 %>% html_table(fill = TRUE)
-  table1 <- tables[[1]]
+  url <- "https://drive.google.com/file/d/1jjSg_xRNBLYoEyQx15nzEv8GgX4QMWbZ/view?usp=sharing"
+  # GaoEtAl2005 <- read_html(url)
+  # tables <- GaoEtAl2005 %>% html_table(fill = TRUE)
+  # table1 <- tables[[1]]
+  table1 <- prepInputs(targetFile = "albedoTable.csv",
+                       url = url,
+                       destinationPath = destinationPath)
   
   # Only keep the snow-free shortwave albedo entries
-  shortwaveAlbedo <- table1[c(26:34), c(2,3,5,7,9)]
+  shortwaveAlbedo <- table1[c(25:33), c(2,3,5,7,9)]
   
   # Add column names
   names(shortwaveAlbedo) <- c("IGBPclass", "lat6070", "lat5060", "lat4050", "lat3040")
   
   # Fix missing entries, set to NA
-  shortwaveAlbedo[shortwaveAlbedo=="â\u0080\u0093"] <- NA
+  shortwaveAlbedo[shortwaveAlbedo=="–"] <- NA
   
   # Convert entries to numeric
   shortwaveAlbedo[, c(2:5)] <- apply(shortwaveAlbedo[, c(2:5)], MARGIN = 2, as.numeric)
