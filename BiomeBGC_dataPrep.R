@@ -766,8 +766,10 @@ climatePolygonMap <- function(climatePolygons){
     
   }
   
+  treedPixels <- !is.na(values(sim$dominantSpecies))
+  
   # If there are no pixels with trees, skip.
-  if (all(is.na(values(sim$dominantSpecies)))){
+  if (all(!treedPixels)){
     message("No treed-pixel in the study area. No simulation will be made by Biome-BGC")
     return(invisible(sim))
   }
@@ -830,8 +832,7 @@ climatePolygonMap <- function(climatePolygons){
     ) |> Cache()
     
     # transfer from cm to m and round to the 0.1 m
-    sim$soilDepth <- sim$soilDepth / 100 |> round(digits = 1)
-    
+    sim$soilDepth <- round(sim$soilDepth / 100, digits = 1)    
   }
   
   # Elevation raster
@@ -871,9 +872,6 @@ climatePolygonMap <- function(climatePolygons){
       fun = "terra::rast"
     ) |> Cache()
     
-    sim$NfixationRates <- postProcessTo(sim$NfixationRates,
-                                        to = rstTo) |> Cache()
-    
     # fill holes
     w <- sum(treedPixels & is.na(values(sim$NfixationRates)))
     while (w != 0){
@@ -885,7 +883,7 @@ climatePolygonMap <- function(climatePolygons){
         w = w + 2
       }
       sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
-      w <- sum(is.na(values(sim$NfixationRates)))
+      w <- sum(treedPixels & is.na(values(sim$NfixationRates)))
     }
     
     sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
