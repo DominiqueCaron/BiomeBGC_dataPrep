@@ -803,7 +803,7 @@ climatePolygonMap <- function(climatePolygons){
   if (!suppliedElsewhere('ecophysiologicalConstants', sim)) {
     
     sim$ecophysiologicalConstants <- prepEPC(
-      url = "https://drive.google.com/file/d/1bvPL_EjAOBbIuH0mmMSmDtoWANVA_Fw3/view?usp=sharing",
+      url = "https://drive.google.com/file/d/1ffAiI9_8cR8nUOXWiWbEa59vOtqEx_ii/view?usp=sharing",
       sppEquiv = sim$sppEquiv,
       destinationPath = dPath
     ) |> Cache()
