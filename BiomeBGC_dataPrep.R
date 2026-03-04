@@ -228,7 +228,7 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
     eventType,
     init = {
       # if there are no treed-pixels, skip all events
-      if (all(is.na(values(sim$dominantSpecies)))) {
+      if (inherits(sim$dominantSpecies, "SpatRater") &&  all(is.na(values(sim$dominantSpecies)))) {
         return(invisible(sim))
       }
       
@@ -705,6 +705,7 @@ climatePolygonMap <- function(climatePolygons){
     } else {
       rstTo <- sim$rasterToMatch
       polyTo <- sim$studyArea
+      treedPixels <- !is.na(values(sim$rasterToMatch))
     }
     
   } else if (geomtype(sim$studyArea) == "points"){
@@ -713,6 +714,7 @@ climatePolygonMap <- function(climatePolygons){
     polyTo <- buffer(sim$studyArea, 10^4)
     rstTo <- terra::rast(polyTo, res = res(sim$rastertoMatch))
     values(rstTo) <- 1
+    treedPixels <- 1
     
   } else {
     
@@ -764,15 +766,17 @@ climatePolygonMap <- function(climatePolygons){
       maskTo = rstTo
     ) |> Cache()
     
+    treedPixels <- !is.na(values(sim$dominantSpecies))
+    
+    # If there are no pixels with trees, skip.
+    if (all(!treedPixels)){
+      message("No treed-pixel in the study area. No simulation will be made by Biome-BGC")
+      return(invisible(sim))
+    }
+    
   }
   
-  treedPixels <- !is.na(values(sim$dominantSpecies))
   
-  # If there are no pixels with trees, skip.
-  if (all(!treedPixels)){
-    message("No treed-pixel in the study area. No simulation will be made by Biome-BGC")
-    return(invisible(sim))
-  }
   
   # Table to link the dominant species to traits of White et al., 2000
   if (!suppliedElsewhere('sppEquiv', sim)) {
