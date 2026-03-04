@@ -228,7 +228,7 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
     eventType,
     init = {
       # if there are no treed-pixels, skip all events
-      if (inherits(sim$dominantSpecies, "SpatRater") &&  all(is.na(values(sim$dominantSpecies)))) {
+      if (inherits(sim$dominantSpecies, "SpatRaster") &&  all(is.na(values(sim$dominantSpecies)))) {
         return(invisible(sim))
       }
       
@@ -935,8 +935,8 @@ climatePolygonMap <- function(climatePolygons){
       method = "near",
       overwrite = TRUE
     ) |> Cache()
-    albedoTable <- rvestAlbedoTable(dPath)
-    sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, rstTo)
+    albedoTable <- rvestAlbedoTable(dPath) |> Cache()
+    sim$shortwaveAlbedo <- lccToAlbedo(lcc, albedoTable, rstTo) |> Cache()
   }
   
   # Meteorological data
