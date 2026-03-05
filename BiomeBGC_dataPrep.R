@@ -343,7 +343,7 @@ preparePixelGroups <- function(sim) {
     values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA
     
     if(P(sim)$savePixelGroupMap){
-      terra::writeRaster(pixelGroupMap, 
+      terra::writeRaster(sim$pixelGroupMap, 
                          filename = file.path(outputPath(sim), "pixelGroupMap.tif"), 
                          overwrite = TRUE)
     }
