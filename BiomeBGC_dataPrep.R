@@ -89,10 +89,13 @@ defineModule(sim, list(
                           "9: annual rate of symbiotic+asymbiotic nitrogen fixation",
                           "The non-na constants will be retrieved in various sources.")
     ),
+    defineParameter("savePixelGroupMap", "logical", FALSE, NA, NA,
+                    paste("If TRUE, the objects pixelGroupMap will be saved.")
+    ),
     defineParameter("siteNames", "character", "site1", NA, NA,
                     paste("The names of the study sites.")
     ),
-    defineParameter("waterState", "numeric", c(NA, 0.5), NA, NA,
+    defineParameter("waterState", "vector", c(NA, 0.5), NA, NA,
                     paste("2-number vector for initial water conditions:",
                           "1: initial snowpack water content (kg/m2)",
                           "2: intial soil water content as a proportion of saturation (DIM)",
@@ -338,6 +341,12 @@ preparePixelGroups <- function(sim) {
     setcolorder(sim$pixelGroupParameters, "pixelGroup")
     
     values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA
+    
+    if(P(sim)$savePixelGroupMap){
+      terra::writeRaster(pixelGroupMap, 
+                         filename = file.path(outputPath(sim), "pixelGroupMap.tif"), 
+                         overwrite = TRUE)
+    }
     
   } else {
     # dominant species
