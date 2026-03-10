@@ -286,12 +286,28 @@ prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSp
       tmax = climate_i[["Climatic_Daily"]]$Tmax,
       tmin = climate_i[["Climatic_Daily"]]$Tmin,
       tday = climate_i[["Climatic_Daily"]]$Tair,
-      prcp = climate_i[["Climatic_Daily"]]$Prcp/10, # from mm to cm
-      vpd = climate_i[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, # from hPa to Pa
+      prcp = round(climate_i[["Climatic_Daily"]]$Prcp/10, digits = 2), # from mm to cm
+      vpd = round(climate_i[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, digits = 2), # from hPa to Pa
       srad = climate_i[["Climatic_Daily"]]$SRad,
       daylen = daylen,
       spinup = climate_i[["Climatic_Daily"]]$Year < simStartYear
     )
+    
+    # Sometimes, there is an artifact, making vpd unreasonably high
+    while (any(climate_i$vpd > 2500)) {
+      # for the vpd exceeding 2.5 kPa, replace by the mean of the timestep before and after
+      toReplace <- which(climate_i$vpd > 2500)
+      for (i in toReplace){
+        if (i == 1){
+          climate_i$vpd[i] <- climate_i$vpd[i+1]
+        } else if (i == length(climate_i$vpd)) {
+          climate_i$vpd[i] <- climate_i$vpd[i-1]
+        } else {
+          climate_i$vpd[i] <- (climate_i$vpd[i+1] + climate_i$vpd[i-1]) / 2
+        }
+        
+      }
+    }
     
     spinupFileName <- tolower(paste0(
       i,
@@ -328,7 +344,6 @@ prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSp
       siteName  = paste0("Climate Polygon: ", i),
       dataSource = paste(climModel, scenario, sep = ": ")
     )
-    
     
     climOut[[as.character(i)]] <- climate_i
   }
