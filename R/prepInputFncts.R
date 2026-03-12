@@ -297,13 +297,13 @@ prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSp
     while (any(climate_i$vpd > 2500)) {
       # for the vpd exceeding 2.5 kPa, replace by the mean of the timestep before and after
       toReplace <- which(climate_i$vpd > 2500)
-      for (i in toReplace){
-        if (i == 1){
-          climate_i$vpd[i] <- climate_i$vpd[i+1]
-        } else if (i == length(climate_i$vpd)) {
-          climate_i$vpd[i] <- climate_i$vpd[i-1]
+      for (j in toReplace){
+        if (j == 1){
+          climate_i$vpd[j] <- climate_i$vpd[j+1]
+        } else if (j == length(climate_i$vpd)) {
+          climate_i$vpd[j] <- climate_i$vpd[j-1]
         } else {
-          climate_i$vpd[i] <- (climate_i$vpd[i+1] + climate_i$vpd[i-1]) / 2
+          climate_i$vpd[j] <- (climate_i$vpd[j+1] + climate_i$vpd[j-1]) / 2
         }
         
       }
@@ -311,9 +311,6 @@ prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSp
     
     spinupFileName <- tolower(paste0(
       i,
-      "_",
-      climModel,
-      scenario,
       "_spinup.mtc43"
     ))
     spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)

@@ -237,7 +237,11 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
       
       sim <- preparePixelGroups(sim)
       
-      sim <- prepareSpinupIni(sim)
+      sim <- prepareSpinupIni(sim) |> 
+        Cache(omitArgs = "sim", 
+              .cacheExtra = list(pixGrParams = sim$pixelGroupParameters,
+                                 simYears = times(sim),
+                                 spinupYears = P(sim)$metSpinupYears))
       
       sim <- prepareIni(sim)
       
@@ -462,19 +466,15 @@ prepareSpinupIni <- function(sim) {
   # Cache some objects to speedup the loop
   userParams <- params(sim)$BiomeBGC_dataPrep
   species_lookup <- setNames(sim$sppEquiv$species, sim$sppEquiv$speciesId)
-  met_suffix <- paste0("_", userParams$climModel, userParams$co2scenario, "_spinup.mtc43")
   restartPath <- file.path("inputs", "restart")
   pixGroupParams <- sim$pixelGroupParameters
-  
   bbgcSpinup.ini <- lapply(seq_len(nPixelGroups), function(pixelGroup_i){
     # First read the ini template
     spinupIni <- iniTemplate
     parameters <- pixGroupParams[pixelGroup_i, ]
     
     ## Set MET_INPUT section
-    fileName <- tolower(paste0(
-      parameters$climatePolygon,
-      met_suffix))
+    fileName <- paste0(parameters$climatePolygon, "_spinup.mtc43")
     spinupIni <- iniSet(spinupIni,
                         "MET_INPUT",
                         1,
