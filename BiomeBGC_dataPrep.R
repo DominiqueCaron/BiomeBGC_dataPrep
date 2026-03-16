@@ -847,6 +847,20 @@ climatePolygonMap <- function(climatePolygons){
       fun = "terra::rast"
     ) |> Cache()
     
+    # fill holes
+    w <- sum(treedPixels & is.na(values(sim$soilDepth)))
+    while (w != 0){
+      w <- round(sqrt(w))
+      # make sure w is a odd number > than 1
+      if(w %% 2 != 1){
+        w = w + 1
+      } else if (w == 1){
+        w = w + 2
+      }
+      sim$soilDepth <- focal(sim$soilDepth, w = w, fun = 'mean', na.policy = 'only')
+      w <- sum(treedPixels & is.na(values(sim$soilDepth)))
+    }
+    
     # transfer from cm to m and round to the 0.1 m
     sim$soilDepth <- round(sim$soilDepth / 100, digits = 1)
   }
