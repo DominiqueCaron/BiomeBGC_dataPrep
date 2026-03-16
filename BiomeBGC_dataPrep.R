@@ -237,11 +237,7 @@ doEvent.BiomeBGC_dataPrep = function(sim, eventTime, eventType) {
       
       sim <- preparePixelGroups(sim)
       
-      sim <- prepareSpinupIni(sim) |> 
-        Cache(omitArgs = "sim", 
-              .cacheExtra = list(pixGrParams = sim$pixelGroupParameters,
-                                 simYears = times(sim),
-                                 spinupYears = P(sim)$metSpinupYears))
+      sim <- prepareSpinupIni(sim)
       
       sim <- prepareIni(sim)
       
@@ -347,8 +343,8 @@ preparePixelGroups <- function(sim) {
     values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA
     
     if(P(sim)$savePixelGroupMap){
-      terra::writeRaster(sim$pixelGroupMap, 
-                         filename = file.path(outputPath(sim), "pixelGroupMap.tif"), 
+      terra::writeRaster(sim$pixelGroupMap,
+                         filename = file.path(outputPath(sim), "pixelGroupMap.tif"),
                          overwrite = TRUE)
     }
     
@@ -456,7 +452,7 @@ prepareSpinupIni <- function(sim) {
   # Set RAMP_NDEP section: N deposition constant for the spinup
   iniTemplate <- iniSet(iniTemplate, "RAMP_NDEP", 1, 0)
   
-  # Set the W_STATE section 
+  # Set the W_STATE section
   iniTemplate <- iniSet(iniTemplate, "W_STATE", 2, P(sim)$waterState[2])
   
   # Create a list of ini files: 1 file per pixelGroup
@@ -561,8 +557,8 @@ prepareSpinupIni <- function(sim) {
     if(userParams$NDeposition[1] == 1 & is.na(userParams$NDeposition[2])){
       year2 <- names(sim$Ndeposition[[2]])
       Ndeposition2 <- parameters$NdepositionT2
-      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", c(2, 3), 
-                          c(year2, 
+      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", c(2, 3),
+                          c(year2,
                             format(Ndeposition2, scientific = FALSE, trim = TRUE))
       )
     } else if (userParams$NDeposition[1] == 1 & !is.na(userParams$NDeposition[2])){
@@ -585,8 +581,9 @@ prepareSpinupIni <- function(sim) {
     }
     
     return(spinupIni)
-  })
-  
+  }) |> Cache(.cacheExtra = list(pixGroupParams = pixGroupParams,
+                                 simYears = times(sim),
+                                 spinupYears = P(sim)$metSpinupYears))
   # add to simList
   names(bbgcSpinup.ini) <- sim$pixelGroupParameters$pixelGroup
   sim$bbgcSpinup.ini <- bbgcSpinup.ini
@@ -595,7 +592,6 @@ prepareSpinupIni <- function(sim) {
 }
 
 prepareIni <- function(sim) {
-  
   # Cache some objects to speedup the loop
   met_suffix <- paste0("_", P(sim)$climModel, P(sim)$co2scenario, "_",
                        start(sim) - P(sim)$metSpinupYears, end(sim), ".mtc43")
@@ -852,7 +848,7 @@ climatePolygonMap <- function(climatePolygons){
     ) |> Cache()
     
     # transfer from cm to m and round to the 0.1 m
-    sim$soilDepth <- round(sim$soilDepth / 100, digits = 1)    
+    sim$soilDepth <- round(sim$soilDepth / 100, digits = 1)
   }
   
   # Elevation raster
