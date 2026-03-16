@@ -838,31 +838,12 @@ climatePolygonMap <- function(climatePolygons){
   # Default source: ORNL NACP MsTMIP
   if (!suppliedElsewhere('soilDepth', sim)) {
     
-    sim$soilDepth <- prepInputs(
-      targetFile = "Unified_NA_Soil_Map_Maximum_Soil_Depth.tif",
-      overwrite = TRUE,
-      url = "https://drive.google.com/file/d/1XviKnfo1JjVaeVl95Il4Hh7DNZp6IPvn/view?usp=sharing",
+    sim$soilDepth <- prepSoilDepth(
       destinationPath = dPath,
       to = rstTo,
-      fun = "terra::rast"
+      treedPixels = treedPixels
     ) |> Cache()
     
-    # fill holes
-    w <- sum(treedPixels & is.na(values(sim$soilDepth)))
-    while (w != 0){
-      w <- round(sqrt(w))
-      # make sure w is a odd number > than 1
-      if(w %% 2 != 1){
-        w = w + 1
-      } else if (w == 1){
-        w = w + 2
-      }
-      sim$soilDepth <- focal(sim$soilDepth, w = w, fun = 'mean', na.policy = 'only')
-      w <- sum(treedPixels & is.na(values(sim$soilDepth)))
-    }
-    
-    # transfer from cm to m and round to the 0.1 m
-    sim$soilDepth <- round(sim$soilDepth / 100, digits = 1)
   }
   
   # Elevation raster
@@ -893,30 +874,12 @@ climatePolygonMap <- function(climatePolygons){
   # Total N fixation rates
   # Default source Reis Ely et al., 2025: https://doi.org/10.1038/s41597-025-05131-4
   if (!suppliedElsewhere('NFixationRates', sim)) {
-    sim$NfixationRates <- prepInputs(
-      targetFile = "BNF_total_central_0.004.tif",
-      overwrite = TRUE,
-      url = "https://drive.google.com/file/d/1AVZvcSBPCuDLagfGsfLbeYkmRl5S5G_d/view?usp=sharing",
+    sim$NfixationRates <- prepNfixation(
       destinationPath = dPath,
       to = rstTo,
-      fun = "terra::rast"
+      treedPixels = treedPixels
     ) |> Cache()
     
-    # fill holes
-    w <- sum(treedPixels & is.na(values(sim$NfixationRates)))
-    while (w != 0){
-      w <- round(sqrt(w))
-      # make sure w is a odd number > than 1
-      if(w %% 2 != 1){
-        w = w + 1
-      } else if (w == 1){
-        w = w + 2
-      }
-      sim$NfixationRates <- focal(sim$NfixationRates, w = w, fun = 'mean', na.policy = 'only')
-      w <- sum(treedPixels & is.na(values(sim$NfixationRates)))
-    }
-    
-    sim$NfixationRates <- round(sim$NfixationRates)/10000 # convert from kg/ha/yr to kg/m2/yr
   }
   
   # Initial snowpack water content
@@ -932,21 +895,13 @@ climatePolygonMap <- function(climatePolygons){
     }
     
     # Get data
-    sim$snowpackWaterContent <- prepInputs(
-      targetFile = "swe_monthly_mm_1981-2020.nc",
-      url = "https://climate-scenarios.canada.ca/files/blended_snow_2024/swe_monthly_mm_1981-2020.zip",
-      fun = "terra::rast",
+    sim$snowpackWaterContent <- prepSnowpackWaterContent(
       destinationPath = dPath,
-      cropTo = rstTo,
-      projectTo = rstTo,
-      maskTo = polyTo,
-      overwrite = TRUE
+      rstTo = rstTo,
+      polyTo = polyTo,
+      year = yearToUse
     ) |> Cache()
     
-    # We use the average for January of the first year.
-    layerToKeep <- which(terra::time(sim$snowpackWaterContent) == paste(yearToUse, "01", "16", sep = "-"))
-    sim$snowpackWaterContent <- round(sim$snowpackWaterContent[[layerToKeep]], -1)
-    terra::units(sim$snowpackWaterContent) <- "kg/m^2"
   }
   
   # Shortwave Albedo
