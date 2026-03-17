@@ -115,7 +115,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
   
   # reprojecting can create holes
   # fill treed pixels without N deposition data with focal()
-  Ndeposition1 <- fillMissingValues(Neposition1, treedPixels, "N deposition rates in the second timestep.")
+  Ndeposition1 <- fillMissingValues(Ndeposition1, treedPixels, "N deposition rates in the second timestep.")
   # mask to study area
   Ndeposition1 <- maskTo(Ndeposition1, to) |> round()
   
@@ -132,7 +132,7 @@ prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
   
   # reprojecting can create holes
   # fill treed pixels without N deposition data with focal()
-  Ndeposition2 <- fillMissingValues(Neposition2, treedPixels, "N deposition rates in the second timestep.")
+  Ndeposition2 <- fillMissingValues(Ndeposition2, treedPixels, "N deposition rates in the second timestep.")
   # mask to study area
   Ndeposition2 <- maskTo(Ndeposition2, to) |> round()
   

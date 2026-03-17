@@ -402,7 +402,7 @@ fillMissingValues <- function(rastWithHoles, treedPixels, inputName) {
   if (w != 0) {
     rastFilled <- copy(rastWithHoles)
     message("Filling missing values for ", inputName, ".")
-    message(w, "pixels to fill.")
+    message(w, " pixels to fill.")
     while (w != 0) {
       w <- round(sqrt(w))
       # make sure w is a odd number > than 1
