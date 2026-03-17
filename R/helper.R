@@ -397,7 +397,7 @@ getOutputDescription <- function(outputId){
 # Inputs that need filling some times: Soil depth, N deposition and N fixation rates
 # We use focal() to fill the missing values
 # fill holes
-fillMissingValues <- function(rastWithHoles, treedpixels, inputName) {
+fillMissingValues <- function(rastWithHoles, treedPixels, inputName) {
   w <- sum(treedPixels & is.na(values(rastWithHoles)))
   if (w != 0) {
     rastFilled <- copy(rastWithHoles)
