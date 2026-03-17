@@ -376,6 +376,9 @@ prepSoilDepth <- function(destinationPath, to, treedPixels){
   # transfer from cm to m and round to the 0.1 m
   soilDepth <- round(soilDepth / 100, digits = 1)
   
+  # mask
+  soilDepth <- maskTo(soilDepth, to)
+  
   return(soilDepth)
 }
 
@@ -396,6 +399,9 @@ prepNfixation <- function(destinationPath, to, treedPixels){
   
   # convert from kg/ha/yr to kg/m2/yr
   NfixationRates <- round(NfixationRates)/10000 
+  
+  # mask
+  NfixationRates <-maskTo(NfixationRates, to)
   
   return(NfixationRates)
 }
