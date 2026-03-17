@@ -404,7 +404,7 @@ fillMissingValues <- function(rastWithHoles, treedPixels, inputName) {
     message("Filling missing values for ", inputName, ".")
     message(w, " pixels to fill.")
     while (w != 0) {
-      w <- round(sqrt(w))
+      w <- round(sqrt(w) * 2)
       # make sure w is a odd number > than 1
       if (w %% 2 != 1) {
         w = w + 1
