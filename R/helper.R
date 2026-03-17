@@ -9,6 +9,7 @@
 # CO2Write
 # initiateEPC
 # lccToAlbedo
+# fillMissingValues
 
 #### EPC helper functions ####
 # reads .epc files
@@ -390,3 +391,37 @@ getOutputDescription <- function(outputId){
   
   return(out)
 }
+
+### Fill missing values in some inputs ####
+# For treed-pixels, some inputs might have missing values 
+# Inputs that need filling some times: Soil depth, N deposition and N fixation rates
+# We use focal() to fill the missing values
+# fill holes
+fillMissingValues <- function(rastWithHoles, treedpixels, inputName) {
+  w <- sum(treedPixels & is.na(values(rastWithHoles)))
+  if (w != 0) {
+    rastFilled <- copy(rastWithHoles)
+    message("Filling missing values for ", inputName, ".")
+    message(w, "pixels to fill.")
+    while (w != 0) {
+      w <- round(sqrt(w))
+      # make sure w is a odd number > than 1
+      if (w %% 2 != 1) {
+        w = w + 1
+      } else if (w == 1) {
+        w = w + 2
+      }
+      rastFilled <- focal(rastFilled,
+                          w = w,
+                          fun = 'mean',
+                          na.policy = 'only')
+      w <- sum(treedPixels & is.na(values(rastFilled)))
+    }
+    message("Done!")
+    
+    return(rastFilled)
+  } else {
+    return(rastWithHoles)
+  }
+}
+

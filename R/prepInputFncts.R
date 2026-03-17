@@ -112,17 +112,10 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     destinationPath = destinationPath,
     fun = "terra::rast"
   )
+  
   # reprojecting can create holes
-  w <- sum(is.na(values(Ndeposition1)))
-  while (w != 0){
-    w <- round(sqrt(w))
-    # make sure w is a odd number
-    if(w %% 2 != 1){
-      w = w+1
-    }
-    Ndeposition1 <- focal(Ndeposition1, w = w, fun = 'mean', na.policy = 'only')
-    w <- sum(is.na(values(Ndeposition1)))
-  }
+  # fill treed pixels without N deposition data with focal()
+  Ndeposition1 <- fillMissingValues(Neposition1, treedPixels, "N deposition rates in the second timestep.")
   # mask to study area
   Ndeposition1 <- maskTo(Ndeposition1, to) |> round()
   
@@ -136,17 +129,10 @@ prepNdeposition <- function(destinationPath, to, year1, year2){
     destinationPath = destinationPath,
     fun = "terra::rast"
   )
-  # fill the holes
-  w <- sum(is.na(values(Ndeposition2)))
-  while (w != 0){
-    w <- round(sqrt(w))
-    # make sure w is a odd number
-    if(w %% 2 != 1){
-      w = w+1
-    }
-    Ndeposition2 <- focal(Ndeposition2, w = w, fun = 'mean', na.policy = 'only')
-    w <- sum(is.na(values(Ndeposition2)))
-  }
+  
+  # reprojecting can create holes
+  # fill treed pixels without N deposition data with focal()
+  Ndeposition2 <- fillMissingValues(Neposition2, treedPixels, "N deposition rates in the second timestep.")
   # mask to study area
   Ndeposition2 <- maskTo(Ndeposition2, to) |> round()
   
@@ -384,19 +370,8 @@ prepSoilDepth <- function(destinationPath, to, treedPixels){
     fun = "terra::rast"
   ) 
   
-  # fill holes
-  w <- sum(treedPixels & is.na(values(soilDepth)))
-  while (w != 0){
-    w <- round(sqrt(w))
-    # make sure w is a odd number > than 1
-    if(w %% 2 != 1){
-      w = w + 1
-    } else if (w == 1){
-      w = w + 2
-    }
-    soilDepth <- focal(soilDepth, w = w, fun = 'mean', na.policy = 'only')
-    w <- sum(treedPixels & is.na(values(soilDepth)))
-  }
+  # fill treed pixels without soil depth data with focal()
+  soilDepth <- fillMissingValues(soilDepth, treedPixels, "soil depth")
   
   # transfer from cm to m and round to the 0.1 m
   soilDepth <- round(soilDepth / 100, digits = 1)
@@ -416,19 +391,8 @@ prepNfixation <- function(destinationPath, to, treedPixels){
     fun = "terra::rast"
   )
   
-  # fill holes
-  w <- sum(treedPixels & is.na(values(NfixationRates)))
-  while (w != 0){
-    w <- round(sqrt(w))
-    # make sure w is a odd number > than 1
-    if(w %% 2 != 1){
-      w = w + 1
-    } else if (w == 1){
-      w = w + 2
-    }
-    NfixationRates <- focal(NfixationRates, w = w, fun = 'mean', na.policy = 'only')
-    w <- sum(treedPixels & is.na(values(NfixationRates)))
-  }
+  # fill treed pixels without soil depth data with focal()
+  NfixationRates <- fillMissingValues(NfixationRates, treedPixels, "N fixation rates")
   
   # convert from kg/ha/yr to kg/m2/yr
   NfixationRates <- round(NfixationRates)/10000 
