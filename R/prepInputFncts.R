@@ -101,7 +101,7 @@ prepSoilTexture <- function(destinationPath, to){
 }
 
 # Extract N-deposition data for 2 years.
-prepNdeposition <- function(destinationPath, to, year1, year2){
+prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
   Ndeposition1 <- prepInputs(
     targetFile = paste0("mean_totN_", year1, "_hm.tif"),
     archive = "Global_N_deposition_grid_dataset_2008_2020.rar",

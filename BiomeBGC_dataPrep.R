@@ -866,7 +866,8 @@ climatePolygonMap <- function(climatePolygons){
       destinationPath = dPath,
       to = rstTo,
       year1 = year1,
-      year2 = year2
+      year2 = year2,
+      treedPixels = treedPixels
     ) |> Cache()
     names(sim$Ndeposition) <- c(max(start(sim), 2008), min(end(sim), 2020))
   }
