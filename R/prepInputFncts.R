@@ -51,6 +51,8 @@ prepSoilTexture <- function(destinationPath, to){
     to = to,
     overwrite = TRUE
   ) |> Cache()
+  sand0_5 <- fillMissingValues(sand0_5, treedPixels, "Sand content 0-5 cm") |> Cache()
+  
   sand5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X5_15_cm_100m1980-2000v1.tif",
@@ -58,6 +60,8 @@ prepSoilTexture <- function(destinationPath, to){
     to = to,
     overwrite = TRUE
   ) |> Cache()
+  sand5_15 <- fillMissingValues(sand5_15, treedPixels, "Sand content 5-15 cm") |> Cache()
+  
   sand15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
@@ -65,6 +69,7 @@ prepSoilTexture <- function(destinationPath, to){
     to = to,
     overwrite = TRUE
   ) |> Cache()
+  sand15_30 <- fillMissingValues(sand15_30, treedPixels, "Sand content 15-30 cm") |> Cache()
   
   sand <- round((5/30) * sand0_5 + (10/30) * sand5_15 + (15/30) * sand15_30, digit = -1)
   
@@ -75,6 +80,7 @@ prepSoilTexture <- function(destinationPath, to){
     to = to,
     overwrite = TRUE
   ) |> Cache()
+  clay0_5 <- fillMissingValues(clay0_5, treedPixels, "Clay content 0-5 cm") |> Cache()
   
   clay5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X5_15_cm_100m1980-2000v1.tif",
@@ -83,6 +89,7 @@ prepSoilTexture <- function(destinationPath, to){
     to = to,
     overwrite = TRUE
   ) |> Cache()
+  clay5_15 <- fillMissingValues(clay5_15, treedPixels, "Clay content 5-15 cm") |> Cache()
   
   clay15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
@@ -91,6 +98,7 @@ prepSoilTexture <- function(destinationPath, to){
     to = to,
     overwrite = TRUE
   ) |> Cache()
+  clay15_30 <- fillMissingValues(clay15_30, treedPixels, "Clay content 15-30 cm") |> Cache()
   
   clay <- round((5/30) * clay0_5 + (10/30) * clay5_15 + (15/30) * clay15_30, digit = -1)
   
