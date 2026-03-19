@@ -829,7 +829,8 @@ climatePolygonMap <- function(climatePolygons){
     
     sim$soilTexture <- prepSoilTexture(
       destinationPath = dPath,
-      to = rstTo
+      to = rstTo,
+      treedPixels = treedPixels
     ) |> Cache()
     
   }

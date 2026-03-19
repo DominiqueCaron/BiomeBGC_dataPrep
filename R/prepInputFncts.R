@@ -41,7 +41,7 @@ prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, m
 
 # Extract % of sand, % of clay and % of silt from CanSIS dataset
 # Takes the average across layers 0-30cm
-prepSoilTexture <- function(destinationPath, to){
+prepSoilTexture <- function(destinationPath, to, treedPixels){
   ## Sand %
   # layer 0-5 cm
   sand0_5 <- prepInputs(
