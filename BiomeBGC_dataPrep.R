@@ -298,25 +298,26 @@ preparePixelGroups <- function(sim) {
     } else {
       dominantSpeciesInPixels <- sim$dominantSpecies
     }
-    
     latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
+    latitudes <- 2 * round(latitudes / 2, digits = 1)
+    
     sim$pixelGroupParameters <- data.table(
       pixelIndex = 1:ncell(sim$rasterToMatch),
       climatePolygon = values(
         rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)
-      ) |> as.vector(),
+      ),
       dominantSpecies = dominantSpeciesInPixels,
-      soilSandContent = values(sim$soilTexture$sand) |> as.vector(),
-      soilClayContent = values(sim$soilTexture$clay) |> as.vector(),
-      soilSiltContent = values(sim$soilTexture$silt) |> as.vector(),
-      soilDepth = values(sim$soilDepth) |> as.vector(),
-      soilAlbedo = values(sim$shortwaveAlbedo) |> as.vector(),
-      NdepositionT1 = values(sim$Ndeposition[[1]]) |> as.vector(),
-      NdepositionT2 = values(sim$Ndeposition[[2]]) |> as.vector(),
-      NfixationRate = values(sim$NfixationRates) |> as.vector(),
-      elevation = values(sim$elevation) |> as.vector(),
-      latitude = round(latitudes, 1),
-      snowPackWaterContent = values(sim$snowpackWaterContent) |> as.vector()
+      soilSandContent = values(sim$soilTexture$sand),
+      soilClayContent = values(sim$soilTexture$clay),
+      soilSiltContent = values(sim$soilTexture$silt),
+      soilDepth = values(sim$soilDepth),
+      soilAlbedo = values(sim$shortwaveAlbedo),
+      NdepositionT1 = values(sim$Ndeposition[[1]]),
+      NdepositionT2 = values(sim$Ndeposition[[2]]),
+      NfixationRate = values(sim$NfixationRates),
+      elevation = values(sim$elevation),
+      latitude = latitudes,
+      snowPackWaterContent = values(sim$snowpackWaterContent)
     )
     nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
     sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
