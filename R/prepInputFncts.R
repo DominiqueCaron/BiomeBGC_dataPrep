@@ -48,28 +48,34 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X0_5_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X0_5_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to,
+    cropTo = to,
+    projectTo = to,
     overwrite = TRUE
   ) |> Cache()
   sand0_5 <- fillMissingValues(sand0_5, treedPixels, "Sand content 0-5 cm") |> Cache()
+  sand0_5 <- maskTo(sand0_5, to) |> Cache()
   
   sand5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X5_15_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to,
+    cropTo = to,
+    projectTo = to,
     overwrite = TRUE
   ) |> Cache()
   sand5_15 <- fillMissingValues(sand5_15, treedPixels, "Sand content 5-15 cm") |> Cache()
+  sand5_15 <- maskTo(sand5_15, to) |> Cache()
   
   sand15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to,
+    cropTo = to,
+    projectTo = to,
     overwrite = TRUE
   ) |> Cache()
   sand15_30 <- fillMissingValues(sand15_30, treedPixels, "Sand content 15-30 cm") |> Cache()
+  sand15_30 <- maskTo(sand15_30, to) |> Cache()
   
   sand <- round((5/30) * sand0_5 + (10/30) * sand5_15 + (15/30) * sand15_30, digit = -1)
   
@@ -77,28 +83,34 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X0_5_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X0_5_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to,
+    cropTo = to,
+    projectTo = to,
     overwrite = TRUE
   ) |> Cache()
   clay0_5 <- fillMissingValues(clay0_5, treedPixels, "Clay content 0-5 cm") |> Cache()
+  clay0_5 <- maskTo(clay0_5, to) |> Cache()
   
   clay5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X5_15_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to,
+    cropTo = to,
+    projectTo = to,
     overwrite = TRUE
   ) |> Cache()
   clay5_15 <- fillMissingValues(clay5_15, treedPixels, "Clay content 5-15 cm") |> Cache()
+  clay5_15 <- maskTo(clay5_15, to) |> Cache()
   
   clay15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
     destinationPath = destinationPath,
-    to = to,
+    cropTo = to,
+    projectTo = to,
     overwrite = TRUE
   ) |> Cache()
   clay15_30 <- fillMissingValues(clay15_30, treedPixels, "Clay content 15-30 cm") |> Cache()
+  clay15_30 <- maskTo(clay15_30, to) |> Cache()
   
   clay <- round((5/30) * clay0_5 + (10/30) * clay5_15 + (15/30) * clay15_30, digit = -1)
   

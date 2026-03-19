@@ -410,7 +410,13 @@ fillMissingValues <- function(rastWithHoles, treedPixels, inputName) {
         w = w + 1
       } else if (w == 1) {
         w = w + 2
+      } 
+      # for windows > 100, it takes a very long time.
+      # it is better to repeat the process several times than once with a very large window
+      if (w > 100) {
+        w = 101
       }
+      
       rastFilled <- focal(rastFilled,
                           w = w,
                           fun = 'mean',
