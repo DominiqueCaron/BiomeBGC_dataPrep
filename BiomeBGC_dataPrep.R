@@ -300,12 +300,9 @@ preparePixelGroups <- function(sim) {
     }
     latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
     latitudes <- 2 * round(latitudes / 2, digits = 1)
-    
     sim$pixelGroupParameters <- data.table(
       pixelIndex = 1:ncell(sim$rasterToMatch),
-      climatePolygon = values(
-        rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)
-      ),
+      climatePolygon = values(rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)),
       dominantSpecies = dominantSpeciesInPixels,
       soilSandContent = values(sim$soilTexture$sand),
       soilClayContent = values(sim$soilTexture$clay),
@@ -319,6 +316,13 @@ preparePixelGroups <- function(sim) {
       latitude = latitudes,
       snowPackWaterContent = values(sim$snowpackWaterContent)
     )
+    .desired_cols <- c(
+      "pixelIndex", "climatePolygon", "dominantSpecies", "soilSandContent",
+      "soilClayContent", "soilSiltContent", "soilDepth", "soilAlbedo",
+      "NdepositionT1", "NdepositionT2", "NfixationRate", "elevation",
+      "latitude", "snowPackWaterContent"
+    )
+    setnames(sim$pixelGroupParameters, .desired_cols)
     nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
     sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
     
