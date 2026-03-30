@@ -122,11 +122,11 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
 
 # Extract N-deposition data for 2 years.
 prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
+  # Units are KgN/yr/ha. Biome-BGC takes KgN/yr/m2
   Ndeposition1 <- prepInputs(
-    targetFile = paste0("mean_totN_", year1, "_hm.tif"),
-    archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
+    targetFile = "2014_2015_2016_annual_total_deposition_of_nitrogen.tif",
     overwrite = TRUE,
-    url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    url = "https://drive.google.com/file/d/1Dnn0OTRdyGIhSU0b512LJB3k4wMg6n4b/view?usp=sharing",
     cropTo = to,
     projectTo = to,
     destinationPath = destinationPath,
@@ -141,10 +141,9 @@ prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
   
   # N deposition for the second time step
   Ndeposition2 <- prepInputs(
-    targetFile = paste0("mean_totN_", year2, "_hm.tif"),
-    archive = "Global_N_deposition_grid_dataset_2008_2020.rar",
+    targetFile = "2019_2020_2021_annual_total_deposition_of_nitrogen.tif",
     overwrite = TRUE,
-    url = "https://springernature.figshare.com/ndownloader/files/48644623",
+    url = "https://drive.google.com/file/d/1cUlrVHR8ePKk_i5oPYZfI8DJHpVPwIcW/view?usp=sharing",
     projectTo = to,
     destinationPath = destinationPath,
     fun = "terra::rast"
@@ -247,12 +246,11 @@ prepEPC <- function(url, sppEquiv, destinationPath){
 
 # Extract the meteorological data
 prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
-  
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude
-  latlon <- project(crds(centroids(climatePolygons)), crs(climatePolygons), "EPSG:4326")
+  latlon <- project(crds(spatSample(climatePolygons, 1)), crs(climatePolygons), "EPSG:4326")
   lon <- latlon[,1]
   lat <- latlon[,2]
   
