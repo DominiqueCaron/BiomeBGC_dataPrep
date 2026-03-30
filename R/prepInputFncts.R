@@ -245,7 +245,7 @@ prepEPC <- function(url, sppEquiv, destinationPath){
 }
 
 # Extract the meteorological data
-prepClimate <- function(climatePolygons, siteName, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
+prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   

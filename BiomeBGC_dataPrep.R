@@ -92,9 +92,6 @@ defineModule(sim, list(
     defineParameter("savePixelGroupMap", "logical", FALSE, NA, NA,
                     paste("If TRUE, the objects pixelGroupMap will be saved.")
     ),
-    defineParameter("siteNames", "character", "site1", NA, NA,
-                    paste("The names of the study sites.")
-    ),
     defineParameter("waterState", "vector", c(NA, 0.5), NA, NA,
                     paste("2-number vector for initial water conditions:",
                           "1: initial snowpack water content (kg/m2)",
@@ -933,7 +930,6 @@ climatePolygonMap <- function(climatePolygons){
     
     sim$meteorologicalData <- prepClimate(
       climatePolygons = sim$climatePolygons,
-      siteName = P(sim)$siteNames,
       simStartYear = start(sim),
       simEndYear = end(sim),
       nSpinupYears = P(sim)$metSpinupYears,
