@@ -861,10 +861,10 @@ climatePolygonMap <- function(climatePolygons){
   }
   
   # Total N deposition
-  # Default source: Zhu et al., 2025: https://doi.org/10.1038/s41467-024-55606-y
+  # Default source: ADAGIO project, Robichaud et al.,2020: (https://doi.org/10.1016/j.atmosenv.2025.121074; https://doi.org/10.1016/j.atmosenv.2025.121656)
   if (!suppliedElsewhere('Ndeposition', sim)) {
-    year1 <- min(max(start(sim), 2008), 2020)
-    year2 <- max(min(end(sim), 2020), 2008)
+    year1 <- max(start(sim), 2015)
+    year2 <- min(end(sim), 2020)
     sim$Ndeposition <-  prepNdeposition(
       destinationPath = dPath,
       to = rstTo,
@@ -872,7 +872,7 @@ climatePolygonMap <- function(climatePolygons){
       year2 = year2,
       treedPixels = treedPixels
     ) |> Cache()
-    names(sim$Ndeposition) <- c(max(start(sim), 2008), min(end(sim), 2020))
+    names(sim$Ndeposition) <- c(year1, year2)
   }
   
   # Total N fixation rates
