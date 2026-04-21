@@ -250,7 +250,15 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
   
   # get latitude and longitude
-  latlon <- project(crds(spatSample(climatePolygons, 1)), crs(climatePolygons), "EPSG:4326")
+  climatePoints <- spatSample(climatePolygons, 1, strata="climatePolygonId")
+  # sometimes there is not always a point per polygon.
+  while (length(climatePoints) != length(climatePolygons)){
+    missingPolygons <- !climatePolygons$climatePolygonId %in% climatePoints$climatePolygonId
+    missingClimatePoints <- centroids(climatePolygons[missingPolygons,])
+    climatePoints <- rbind(climatePoints, missingClimatePoints)
+  }
+  id <- climatePoints$climatePolygonId
+  latlon <- project(crds(climatePoints), crs(climatePolygons), "EPSG:4326")
   lon <- latlon[,1]
   lat <- latlon[,2]
   
