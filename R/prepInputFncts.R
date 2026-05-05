@@ -16,7 +16,7 @@ prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, m
   # prepare url and targetFile for prepInput call
   domSppURL <- paste0("https://opendata.nfis.org/downloads/forest_change/CA_Tree_Species_Classification_", year, ".zip")
   domSppTF <- paste0("CA_Forest_Tree_Species_", year, ".tif")
-  
+
   # prepInput
   dominantSpecies <- prepInputs(
     targetFile = domSppTF,
@@ -30,12 +30,12 @@ prepNTEMSDominantSpecies <- function(year, destinationPath, cropTo, projectTo, m
   )
   # set 0 to NA
   NAflag(dominantSpecies) <- 0
-  
+
   # Transform NTEMS code to speciesCode
   cls <- unique(LandR::sppEquivalencies_CA[, c("NTEMS_Species_Code", "LandR")]) |> na.omit()
   names(cls) <- c("id", "category")
   levels(dominantSpecies) <- cls
-  
+
   return(dominantSpecies)
 }
 
@@ -54,7 +54,7 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
   ) |> Cache()
   sand0_5 <- fillMissingValues(sand0_5, treedPixels, "Sand content 0-5 cm") |> Cache()
   sand0_5 <- maskTo(sand0_5, to) |> Cache()
-  
+
   sand5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X5_15_cm_100m1980-2000v1.tif",
@@ -65,7 +65,7 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
   ) |> Cache()
   sand5_15 <- fillMissingValues(sand5_15, treedPixels, "Sand content 5-15 cm") |> Cache()
   sand5_15 <- maskTo(sand5_15, to) |> Cache()
-  
+
   sand15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Sand/Sand_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Sand_X15_30_cm_100m1980-2000v1.tif",
@@ -76,9 +76,9 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
   ) |> Cache()
   sand15_30 <- fillMissingValues(sand15_30, treedPixels, "Sand content 15-30 cm") |> Cache()
   sand15_30 <- maskTo(sand15_30, to) |> Cache()
-  
+
   sand <- round((5/30) * sand0_5 + (10/30) * sand5_15 + (15/30) * sand15_30, digit = -1)
-  
+
   clay0_5 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X0_5_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X0_5_cm_100m1980-2000v1.tif",
@@ -89,7 +89,7 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
   ) |> Cache()
   clay0_5 <- fillMissingValues(clay0_5, treedPixels, "Clay content 0-5 cm") |> Cache()
   clay0_5 <- maskTo(clay0_5, to) |> Cache()
-  
+
   clay5_15 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X5_15_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X5_15_cm_100m1980-2000v1.tif",
@@ -100,7 +100,7 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
   ) |> Cache()
   clay5_15 <- fillMissingValues(clay5_15, treedPixels, "Clay content 5-15 cm") |> Cache()
   clay5_15 <- maskTo(clay5_15, to) |> Cache()
-  
+
   clay15_30 <- prepInputs(
     url = "https://sis.agr.gc.ca/cansis/nsdb/psm/Clay/Clay_X15_30_cm_100m1980-2000v1.tif",
     targetFile = "Clay_X15_30_cm_100m1980-2000v1.tif",
@@ -111,9 +111,9 @@ prepSoilTexture <- function(destinationPath, to, treedPixels){
   ) |> Cache()
   clay15_30 <- fillMissingValues(clay15_30, treedPixels, "Clay content 15-30 cm") |> Cache()
   clay15_30 <- maskTo(clay15_30, to) |> Cache()
-  
+
   clay <- round((5/30) * clay0_5 + (10/30) * clay5_15 + (15/30) * clay15_30, digit = -1)
-  
+
   silt <- 100 - (sand + clay)
   soilTexture <- c(sand, silt, clay)
   names(soilTexture) <- c("sand", "silt", "clay")
@@ -132,13 +132,13 @@ prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
     destinationPath = destinationPath,
     fun = "terra::rast"
   )
-  
+
   # reprojecting can create holes
   # fill treed pixels without N deposition data with focal()
   Ndeposition1 <- fillMissingValues(Ndeposition1, treedPixels, "N deposition rates in the first timestep.")
   # mask to study area
   Ndeposition1 <- maskTo(Ndeposition1, to) |> round()
-  
+
   # N deposition for the second time step
   Ndeposition2 <- prepInputs(
     targetFile = "2019_2020_2021_annual_total_deposition_of_nitrogen.tif",
@@ -148,17 +148,17 @@ prepNdeposition <- function(destinationPath, to, year1, year2, treedPixels){
     destinationPath = destinationPath,
     fun = "terra::rast"
   )
-  
+
   # reprojecting can create holes
   # fill treed pixels without N deposition data with focal()
   Ndeposition2 <- fillMissingValues(Ndeposition2, treedPixels, "N deposition rates in the second timestep.")
   # mask to study area
   Ndeposition2 <- maskTo(Ndeposition2, to) |> round()
-  
+
   # convert from kg/ha/yr to kg/m2/yr
   Ndeposition <- c(Ndeposition1/10000, Ndeposition2/10000)
   names(Ndeposition) <- as.character(c(year1, year2))
-  
+
   return(Ndeposition)
 }
 
@@ -172,19 +172,19 @@ rvestAlbedoTable <- function(destinationPath){
   table1 <- prepInputs(targetFile = "albedoTable.csv",
                        url = url,
                        destinationPath = destinationPath)
-  
+
   # Only keep the snow-free shortwave albedo entries
   shortwaveAlbedo <- table1[c(25:33), c(2,3,5,7,9)]
-  
+
   # Add column names
   names(shortwaveAlbedo) <- c("IGBPclass", "lat6070", "lat5060", "lat4050", "lat3040")
-  
+
   # Fix missing entries, set to NA
   shortwaveAlbedo[shortwaveAlbedo=="–"] <- NA
-  
+
   # Convert entries to numeric
   shortwaveAlbedo[, c(2:5)] <- apply(shortwaveAlbedo[, c(2:5)], MARGIN = 2, as.numeric)
-  
+
   return(as.data.frame(shortwaveAlbedo))
 }
 
@@ -234,13 +234,13 @@ prepEPC <- function(url, sppEquiv, destinationPath){
                     check.names = TRUE,
                     overwrite = TRUE,
                     purge = 7)
-  
+
   # keep only the lines for the species in study
   epc <- epc[epc$speciesId %in% sppEquiv$speciesId, ]
-  
+
   # Write the species-level epcs in the destinationPath/epc folder
   apply(epc, MARGIN = 1, epcWrite2, destinationPath = destinationPath)
-  
+
   return(epc)
 }
 
@@ -248,7 +248,7 @@ prepEPC <- function(url, sppEquiv, destinationPath){
 prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
-  
+
   # get latitude and longitude
   climatePoints <- spatSample(climatePolygons, 1, strata="climatePolygonId")
   # sometimes there is not always a point per polygon.
@@ -261,16 +261,9 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
   latlon <- project(crds(climatePoints), crs(climatePolygons), "EPSG:4326")
   lon <- latlon[,1]
   lat <- latlon[,2]
-  
-  if ("climatePolygonId" %in% names(climatePolygons)){
-    id = climatePolygons$climatePolygonId
-  } else {
-    id = c(1:length(climatePolygons))
-  }
-  
+
   # define the first year to extract climate
   firstYear <- simStartYear - nSpinupYears
-  
   # get climate from BioSim
   climate <- generateWeather(
     modelNames = c("Climatic_Daily", "VaporPressureDeficit_Daily"),
@@ -283,7 +276,7 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
     climModel = climModel,
     additionalParms = NULL
   )
-  
+
   # format climate data, 1 ecodistrict at a time
   climOut <- list()
   for (i in id) {
@@ -293,9 +286,9 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
       x <- x[x$Month != 2 | x$Day != 29,]
       x
     })
-    
+
     daylen <- daylength(lat[id == i], 1:365) * 60 * 60
-    
+
     climate_i <- data.frame(
       year = climate_i[["Climatic_Daily"]]$Year,
       yday = 1:365,
@@ -308,7 +301,7 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
       daylen = daylen,
       spinup = climate_i[["Climatic_Daily"]]$Year < simStartYear
     )
-    
+
     # Sometimes, there is an artifact, making vpd unreasonably high
     while (any(climate_i$vpd > 2500)) {
       # for the vpd exceeding 2.5 kPa, replace by the mean of the timestep before and after
@@ -321,23 +314,23 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
         } else {
           climate_i$vpd[j] <- (climate_i$vpd[j+1] + climate_i$vpd[j-1]) / 2
         }
-        
+
       }
     }
-    
+
     spinupFileName <- tolower(paste0(
       i,
       "_spinup.mtc43"
     ))
     spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
-    
+
     metWrite(
       metData = climate_i[climate_i$spinup, c(1:10)],
       fileName = spinupFileName,
       siteName  = paste0("Climate Polygon: ", i),
       dataSource = paste(climModel, scenario, sep = ": ")
     )
-    
+
     # Met data for main simulation
     fileName <- tolower(paste0(
       i,
@@ -350,17 +343,17 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
       ".mtc43"
     ))
     fileName <- file.path(destinationPath, "metdata", fileName)
-    
+
     metWrite(
       metData = climate_i[, c(1:10)],
       fileName = fileName,
       siteName  = paste0("Climate Polygon: ", i),
       dataSource = paste(climModel, scenario, sep = ": ")
     )
-    
+
     climOut[[as.character(i)]] <- climate_i
   }
-  
+
   return(climOut)
 }
 
@@ -371,13 +364,13 @@ prepElevation <- function(studyArea, to){
     locations = sf::st_as_sf(studyArea),
     z = 10
   )
-  
+
   # Crop and project to raster
   elevation <- postProcessTo(
     rast(elevation),
     to = to
   )
-  
+
   # round to the nearest 50m
   return(50 * round(elevation/50))
 }
@@ -385,7 +378,7 @@ prepElevation <- function(studyArea, to){
 
 # Extract soil depth raster
 prepSoilDepth <- function(destinationPath, to, treedPixels){
-  
+
   # Default source: ORNL NACP MsTMIP
   soilDepth <- prepInputs(
     targetFile = "Unified_NA_Soil_Map_Maximum_Soil_Depth.tif",
@@ -394,17 +387,17 @@ prepSoilDepth <- function(destinationPath, to, treedPixels){
     destinationPath = destinationPath,
     to = to,
     fun = "terra::rast"
-  ) 
-  
+  )
+
   # fill treed pixels without soil depth data with focal()
   soilDepth <- fillMissingValues(soilDepth, treedPixels, "soil depth")
-  
+
   # transfer from cm to m and round to the 0.1 m
   soilDepth <- round(soilDepth / 100, digits = 1)
-  
+
   # mask
   soilDepth <- maskTo(soilDepth, to)
-  
+
   return(soilDepth)
 }
 
@@ -419,25 +412,24 @@ prepNfixation <- function(destinationPath, to, treedPixels){
     to = to,
     fun = "terra::rast"
   )
-  
+
   # fill treed pixels without soil depth data with focal()
   NfixationRates <- fillMissingValues(NfixationRates, treedPixels, "N fixation rates")
-  
+
   # convert from kg/ha/yr to kg/m2/yr
-  NfixationRates <- round(NfixationRates)/10000 
-  
+  NfixationRates <- round(NfixationRates)/10000
+
   # mask
   NfixationRates <-maskTo(NfixationRates, to)
-  
+
   return(NfixationRates)
 }
 
-# Extract snowpack water equivalent 
+# Extract snowpack water equivalent
 # Default source: ECC snow water equivalent (SWE) over the Northern Hemisphere
 # Methods: Mudryk et al., 2015: https://doi.org/10.1175/JCLI-D-15-0229.1
 # data is available for 1981-2020
 prepSnowpackWaterContent <- function(destinationPath, rstTo, polyTo, year){
-  
   # Get data
   snowpackWaterContent <- prepInputs(
     targetFile = "swe_monthly_mm_1981-2020.nc",
@@ -445,16 +437,21 @@ prepSnowpackWaterContent <- function(destinationPath, rstTo, polyTo, year){
     fun = "terra::rast",
     destinationPath = destinationPath,
     cropTo = rstTo,
-    projectTo = rstTo,
-    maskTo = polyTo,
     overwrite = TRUE
   )
-  
+
   # Use the average for January of the first year.
   layerToKeep <- which(terra::time(snowpackWaterContent) == paste(year, "01", "16", sep = "-"))
-  snowpackWaterContent <- round(snowpackWaterContent[[layerToKeep]], -1)
-  
+
+  snowpackWaterContent <- postProcessTo(
+    snowpackWaterContent[[layerToKeep]],
+    projectTo = rstTo,
+    maskTo = polyTo
+  )
+
+  snowpackWaterContent <- round(snowpackWaterContent, -1)
+
   terra::units(snowpackWaterContent) <- "kg/m^2"
-  
+
   return(snowpackWaterContent)
 }
