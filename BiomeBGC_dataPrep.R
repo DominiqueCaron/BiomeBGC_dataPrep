@@ -743,22 +743,20 @@ climatePolygonMap <- function(climatePolygons){
       targetFile = "ecodistricts.shp",
       url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/district/ecodistrict_shp.zip",
       destinationPath = dPath,
-      cropTo = rstTo,
       projectTo = rstTo,
       fun = "terra::vect"
-    ) |> Cache()
+    ) |>
+      Cache()
     sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
-    
-    # if using points as studyArea, only keeps the polygons containing the points
-    if (geomtype(sim$studyArea) == "points"){
-      rel <- terra::relate(sim$climatePolygons, sim$studyArea, relation="intersects")
-      poly_indices <- which(rowSums(rel) > 0)
-      sim$climatePolygons <- sim$climatePolygons[poly_indices, ]
-    } else {
-      sim$climatePolygons <- maskTo(sim$climatePolygons, maskTo = polyTo)
-    }
-    
-    
+
+    # keeps the polygons that touches the studyarea
+    rel <- terra::relate(
+      sim$climatePolygons,
+      sim$studyArea,
+      relation = "intersects"
+    )
+    poly_indices <- which(rowSums(rel) > 0)
+    sim$climatePolygons <- sim$climatePolygons[poly_indices, ]
   }
   
   # Dominant species layer

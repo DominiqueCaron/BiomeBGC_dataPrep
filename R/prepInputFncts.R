@@ -246,30 +246,44 @@ prepEPC <- function(url, sppEquiv, destinationPath){
 
 # Extract the meteorological data
 prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears, scenario, climModel, destinationPath){
+  # define the first year to extract climate
+  firstYear <- simStartYear - nSpinupYears
+  
   # Create a folder where metdata will be saved
   dir.create(file.path(destinationPath, "metdata"), showWarnings = FALSE)
-
-  # get latitude and longitude
-  climatePoints <- spatSample(climatePolygons, 1, strata="climatePolygonId")
-  # sometimes there is not always a point per polygon.
-  while (length(climatePoints) != length(climatePolygons)){
-    missingPolygons <- !climatePolygons$climatePolygonId %in% climatePoints$climatePolygonId
-    missingClimatePoints <- centroids(climatePolygons[missingPolygons,])
-    climatePoints <- rbind(climatePoints, missingClimatePoints)
+  
+  climOut <- list()
+  # Process one climate polygon at a time
+  id <- climatePolygons$climatePolygonId
+  for (climatePolygon_i in id){
+    climOut[[as.character(climatePolygon_i)]] <- prepClimateSinglePolygon(
+      climatePolygon = climatePolygons[climatePolygons$climatePolygonId == climatePolygon_i, ],
+      id = climatePolygon_i,
+      firstYear = firstYear,
+      simStartYear = simEndYear,
+      simEndYear = simEndYear,
+      scenario,
+      climModel,
+      destinationPath = destinationPath
+    ) |> Cache(omitArgs = "climatePolygon")
   }
-  id <- climatePoints$climatePolygonId
-  latlon <- project(crds(climatePoints), crs(climatePolygons), "EPSG:4326")
+  return(climOut)
+}
+
+prepClimateSinglePolygon <- function(climatePolygon, id, firstYear, simStartYear, simEndYear, scenario, climModel, destinationPath){
+    # get latitude and longitude
+  climatePoint <- spatSample(climatePolygon, 1)
+  
+  latlon <- project(crds(climatePoint), crs(climatePolygon), "EPSG:4326")
   lon <- latlon[,1]
   lat <- latlon[,2]
 
-  # define the first year to extract climate
-  firstYear <- simStartYear - nSpinupYears
   # get climate from BioSim
   climate <- generateWeather(
     modelNames = c("Climatic_Daily", "VaporPressureDeficit_Daily"),
     fromYr = firstYear,
     toYr = simEndYear,
-    id = id,
+    id = 1,
     latDeg = lat,
     longDeg = lon,
     rcp = scenario,
@@ -278,62 +292,59 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
   )
 
   # format climate data, 1 ecodistrict at a time
-  climOut <- list()
-  for (i in id) {
-    climate_i <- lapply(climate, FUN = function(x){
-      x <- x[x$KeyID == i, ]
+    climate <- lapply(climate, FUN = function(x){
       # BiomeBGC do not simulate Feb 29 (always 365 day/yr)
       x <- x[x$Month != 2 | x$Day != 29,]
       x
     })
 
-    daylen <- daylength(lat[id == i], 1:365) * 60 * 60
+    daylen <- daylength(lat, 1:365) * 60 * 60
 
-    climate_i <- data.frame(
-      year = climate_i[["Climatic_Daily"]]$Year,
+    climate <- data.frame(
+      year = climate[["Climatic_Daily"]]$Year,
       yday = 1:365,
-      tmax = climate_i[["Climatic_Daily"]]$Tmax,
-      tmin = climate_i[["Climatic_Daily"]]$Tmin,
-      tday = climate_i[["Climatic_Daily"]]$Tair,
-      prcp = round(climate_i[["Climatic_Daily"]]$Prcp/10, digits = 2), # from mm to cm
-      vpd = round(climate_i[["VaporPressureDeficit_Daily"]]$VaporPressureDeficit * 100, digits = 2), # from hPa to Pa
-      srad = climate_i[["Climatic_Daily"]]$SRad,
+      tmax = climate[["Climatic_Daily"]]$Tmax,
+      tmin = climate[["Climatic_Daily"]]$Tmin,
+      tday = climate[["Climatic_Daily"]]$Tair,
+      prcp = round(climate[["Climatic_Daily"]]$Prcp/10, digits = 2), # from mm to cm
+      vpd = round(climate[["VaporPressureDeficit_Daily"]]$DaylightVPD * 100, digits = 2), # from hPa to Pa
+      srad = climate[["Climatic_Daily"]]$SRad,
       daylen = daylen,
-      spinup = climate_i[["Climatic_Daily"]]$Year < simStartYear
+      spinup = climate[["Climatic_Daily"]]$Year < simStartYear
     )
 
     # Sometimes, there is an artifact, making vpd unreasonably high
-    while (any(climate_i$vpd > 2500)) {
-      # for the vpd exceeding 2.5 kPa, replace by the mean of the timestep before and after
-      toReplace <- which(climate_i$vpd > 2500)
+    while (any(climate$vpd > 10^4)) {
+      # for the vpd exceeding 10 kPa, replace by the mean of the timestep before and after
+      toReplace <- which(climate$vpd > 10^4)
       for (j in toReplace){
         if (j == 1){
-          climate_i$vpd[j] <- climate_i$vpd[j+1]
-        } else if (j == length(climate_i$vpd)) {
-          climate_i$vpd[j] <- climate_i$vpd[j-1]
+          climate$vpd[j] <- climate$vpd[j+1]
+        } else if (j == length(climate$vpd)) {
+          climate$vpd[j] <- climate$vpd[j-1]
         } else {
-          climate_i$vpd[j] <- (climate_i$vpd[j+1] + climate_i$vpd[j-1]) / 2
+          climate$vpd[j] <- (climate$vpd[j+1] + climate$vpd[j-1]) / 2
         }
 
       }
     }
 
     spinupFileName <- tolower(paste0(
-      i,
+      id,
       "_spinup.mtc43"
     ))
     spinupFileName <- file.path(destinationPath, "metdata", spinupFileName)
 
     metWrite(
-      metData = climate_i[climate_i$spinup, c(1:10)],
+      metData = climate[climate$spinup, c(1:10)],
       fileName = spinupFileName,
-      siteName  = paste0("Climate Polygon: ", i),
+      siteName  = paste0("Climate Polygon: ", id),
       dataSource = paste(climModel, scenario, sep = ": ")
     )
 
     # Met data for main simulation
     fileName <- tolower(paste0(
-      i,
+      id,
       "_",
       climModel,
       scenario,
@@ -345,16 +356,14 @@ prepClimate <- function(climatePolygons, simStartYear, simEndYear, nSpinupYears,
     fileName <- file.path(destinationPath, "metdata", fileName)
 
     metWrite(
-      metData = climate_i[, c(1:10)],
+      metData = climate[, c(1:10)],
       fileName = fileName,
-      siteName  = paste0("Climate Polygon: ", i),
+      siteName  = paste0("Climate Polygon: ", id),
       dataSource = paste(climModel, scenario, sep = ": ")
     )
 
-    climOut[[as.character(i)]] <- climate_i
-  }
-
-  return(climOut)
+    return(climate)
+  
 }
 
 # Extract elevation raster
