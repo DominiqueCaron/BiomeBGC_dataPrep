@@ -281,68 +281,17 @@ Save <- function(sim) {
 }
 
 preparePixelGroups <- function(sim) {
+  message("Grouping pixels sharing parameters.")
   field <- "climatePolygonId"
   
   # tag if studyArea is a point vector
   SAisPolygon <- geomtype(sim$studyArea) == "polygons"
   
   if (SAisPolygon){
-    # if the studyArea is a polygon, extract values for each cell
-    if (inherits(sim$dominantSpecies, "SpatRaster")){
-      dominantSpeciesInPixels <- values(sim$dominantSpecies, drop = TRUE)
-      speciesNames <- cats(sim$dominantSpecies)[[1]]$category
-      dominantSpeciesInPixels <- speciesNames[dominantSpeciesInPixels]
-    } else {
-      dominantSpeciesInPixels <- sim$dominantSpecies
-    }
-    latitudes <- project(crds(sim$rasterToMatch, na.rm = F), crs(sim$rasterToMatch), "EPSG:4326")[,2]
-    latitudes <- 2 * round(latitudes / 2, digits = 1)
-    sim$pixelGroupParameters <- data.table(
-      pixelIndex = 1:ncell(sim$rasterToMatch),
-      climatePolygon = values(rasterize(sim$climatePolygons, sim$rasterToMatch, field = field)),
-      dominantSpecies = dominantSpeciesInPixels,
-      soilSandContent = values(sim$soilTexture$sand),
-      soilClayContent = values(sim$soilTexture$clay),
-      soilSiltContent = values(sim$soilTexture$silt),
-      soilDepth = values(sim$soilDepth),
-      soilAlbedo = values(sim$shortwaveAlbedo),
-      NdepositionT1 = values(sim$Ndeposition[[1]]),
-      NdepositionT2 = values(sim$Ndeposition[[2]]),
-      NfixationRate = values(sim$NfixationRates),
-      elevation = values(sim$elevation),
-      latitude = latitudes,
-      snowPackWaterContent = values(sim$snowpackWaterContent)
-    )
-    .desired_cols <- c(
-      "pixelIndex", "climatePolygon", "dominantSpecies", "soilSandContent",
-      "soilClayContent", "soilSiltContent", "soilDepth", "soilAlbedo",
-      "NdepositionT1", "NdepositionT2", "NfixationRate", "elevation",
-      "latitude", "snowPackWaterContent"
-    )
-    setnames(sim$pixelGroupParameters, .desired_cols)
-    nonForested <- is.na(sim$pixelGroupParameters$dominantSpecies)
-    sim$pixelGroupParameters[nonForested, names(sim$pixelGroupParameters) := NA]
     
-    cols <- setdiff(names(sim$pixelGroupParameters), "pixelIndex")
-    
-    sim$pixelGroupParameters[, "pixelGroup"] <- LandR::generatePixelGroups(
-      sim$pixelGroupParameters,
-      maxPixelGroup = 0,
-      columns = cols
-    )
-    
-    sim$pixelGroupMap <- copy(sim$rasterToMatch)
-    values(sim$pixelGroupMap) <- sim$pixelGroupParameters[, "pixelGroup"]
-    
-    cols <- c(cols, "pixelGroup")
-    sim$pixelGroupParameters<- unique(
-      sim$pixelGroupParameters[,  ..cols],
-      by = "pixelGroup"
-    ) |> na.omit()
-    setkey(sim$pixelGroupParameters, pixelGroup)
-    setcolorder(sim$pixelGroupParameters, "pixelGroup")
-    
-    values(sim$pixelGroupMap)[!(values(sim$pixelGroupMap) %in% sim$pixelGroupParameters$pixelGroup)] <- NA
+    pixelGroups <- prepPixelGroups(sim$dominantSpecies, sim$climatePolygons, sim$soilTexture, sim$soilDepth, sim$shortwaveAlbedo, sim$Ndeposition, sim$NfixationRates, sim$elevation, sim$snowpackWaterContent, sim$rasterToMatch) |> Cache()
+    sim$pixelGroupParameters <- pixelGroups$pixelGroupParameters
+    sim$pixelGroupMap <- pixelGroups$pixelGroupMap
     
     if(P(sim)$savePixelGroupMap){
       terra::writeRaster(sim$pixelGroupMap,
@@ -400,6 +349,7 @@ preparePixelGroups <- function(sim) {
 }
 
 prepareSpinupIni <- function(sim) {
+  message("Creating ini files for the spinup.")
   iniTemplate <- iniRead(system.file("inputs/ini/template.ini", package = "BiomeBGCR"))
   
   # set sections that are shared across all pixelGroups
@@ -457,143 +407,24 @@ prepareSpinupIni <- function(sim) {
   # Set the W_STATE section
   iniTemplate <- iniSet(iniTemplate, "W_STATE", 2, P(sim)$waterState[2])
   
-  # Create a list of ini files: 1 file per pixelGroup
-  nPixelGroups <- nrow(sim$pixelGroupParameters)
-  bbgcSpinup.ini <- vector("list", nPixelGroups)
-  
-  # Cache some objects to speedup the loop
-  userParams <- params(sim)$BiomeBGC_dataPrep
+  # Species lookup table linking species name and id
   species_lookup <- setNames(sim$sppEquiv$species, sim$sppEquiv$speciesId)
-  restartPath <- file.path("inputs", "restart")
-  pixGroupParams <- sim$pixelGroupParameters
-  bbgcSpinup.ini <- lapply(seq_len(nPixelGroups), function(pixelGroup_i){
-    # First read the ini template
-    spinupIni <- iniTemplate
-    parameters <- pixGroupParams[pixelGroup_i, ]
-    
-    ## Set MET_INPUT section
-    fileName <- paste0(parameters$climatePolygon, "_spinup.mtc43")
-    spinupIni <- iniSet(spinupIni,
-                        "MET_INPUT",
-                        1,
-                        file.path("inputs", "metdata", fileName))
-    
-    ## Set RESTART section
-    spinupIni <- iniSet(spinupIni,
-                        "RESTART",
-                        c(5, 6),
-                        file.path(restartPath, paste0(parameters$pixelGroup, ".restart")))
-    
-    ## Set SITE section
-    # For each check if NA, if it is get the value from different sources
-    # Soil depth
-    if(is.na(userParams$siteConstants[1])){
-      spinupIni <- iniSet(spinupIni, "SITE", 1,
-                          parameters$soilDepth)
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", 1,
-                          userParams$siteConstants[1])
-    }
-    
-    # Soil texture: % of sand, % of silt, % of clay
-    if(is.na(userParams$siteConstants[2])){
-      spinupIni <- iniSet(spinupIni, "SITE", c(2:4),
-                          c(parameters$soilSandContent,
-                            parameters$soilSiltContent,
-                            parameters$soilClayContent))
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", c(2:4),
-                          userParams$siteConstants[c(2:4)])
-    }
-    
-    # Elevation
-    if(is.na(userParams$siteConstants[5])){
-      spinupIni <- iniSet(spinupIni, "SITE", 5, parameters$elevation)
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", 5, userParams$siteConstants[5])
-    }
-    
-    # Latitude
-    if (is.na(userParams$siteConstants[6])) {
-      spinupIni <- iniSet(spinupIni, "SITE", 6, parameters$latitude)
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", 6, userParams$siteConstants[6])
-    }
-    
-    # Site shortwave albedo
-    if (is.na(userParams$siteConstants[7])) {
-      spinupIni <- iniSet(spinupIni, "SITE", 7, parameters$soilAlbedo)
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", 7, userParams$siteConstants[7])
-    }
-    
-    # wet+dry atmospheric deposition of N
-    if (is.na(userParams$siteConstants[8])) {
-      spinupIni <- iniSet(spinupIni,
-                          "SITE",
-                          8,
-                          format(
-                            parameters$NdepositionT1,
-                            scientific = FALSE,
-                            trim = TRUE
-                          ))
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", 8, userParams$siteConstants[8])
-    }
-    
-    # symbiotic+asymbiotic fixation of N
-    if (is.na(userParams$siteConstants[9])) {
-      spinupIni <- iniSet(spinupIni,
-                          "SITE",
-                          9,
-                          format(
-                            parameters$NfixationRate,
-                            scientific = FALSE,
-                            trim = TRUE
-                          ))
-    } else {
-      spinupIni <- iniSet(spinupIni, "SITE", 9, userParams$siteConstants[9])
-    }
-    
-    # Set RAMP_NDEP section
-    if(userParams$NDeposition[1] == 1 & is.na(userParams$NDeposition[2])){
-      year2 <- names(sim$Ndeposition[[2]])
-      Ndeposition2 <- parameters$NdepositionT2
-      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", c(2, 3),
-                          c(year2,
-                            format(Ndeposition2, scientific = FALSE, trim = TRUE))
-      )
-    } else if (userParams$NDeposition[1] == 1 & !is.na(userParams$NDeposition[2])){
-      spinupIni <- iniSet(spinupIni, "RAMP_NDEP", c(2,3), userParams$NDeposition[c(2,3)])
-    }
-    
-    # Set EPC_FILE section
-    # extract the correct dominant species
-    dominantSpecies <- species_lookup[[parameters$dominantSpecies]]
-    # set filename
-    fileName <- tolower(paste0(gsub(" ", "", dominantSpecies), ".epc"))
-    # set in ini file
-    spinupIni <- iniSet(spinupIni, "EPC_FILE", 1, file.path("inputs", "epc", fileName))
-    
-    # Set W_STATE section
-    if(is.na(userParams$waterState[1])){
-      spinupIni <- iniSet(spinupIni, "W_STATE", 1, parameters$snowPackWaterContent)
-    } else {
-      spinupIni <- iniSet(spinupIni, "W_STATE", 1, userParams$waterState[1])
-    }
-    
-    return(spinupIni)
-  }) |> Cache(.cacheExtra = list(pixGroupParams = pixGroupParams,
-                                 simYears = times(sim),
-                                 spinupYears = P(sim)$metSpinupYears))
-  # add to simList
-  names(bbgcSpinup.ini) <- sim$pixelGroupParameters$pixelGroup
-  sim$bbgcSpinup.ini <- bbgcSpinup.ini
+  # Name of the second reference year for N deposition
+  Ndep_yr2 = ifelse(nlyr(sim$Ndeposition) == 2, names(sim$Ndeposition[[2]]), NA)
   
+  # Prepare ini files for the spinup
+  sim$bbgcSpinup.ini <- prepSpinupIni(
+    pixelGroupParameters = sim$pixelGroupParameters,
+    iniTemplate = iniTemplate,
+    userParams = params(sim)$BiomeBGC_dataPrep,
+    species_lookup = species_lookup,
+    Ndep_yr2 = Ndep_yr2
+  ) |> Cache(omitArgs = "userParams")
   return(invisible(sim))
 }
 
 prepareIni <- function(sim) {
+  message("Creating ini files for the main simulation.")
   # Cache some objects to speedup the loop
   met_suffix <- paste0("_", P(sim)$climModel, P(sim)$co2scenario, "_",
                        start(sim) - P(sim)$metSpinupYears, end(sim), ".mtc43")
@@ -736,29 +567,6 @@ climatePolygonMap <- function(climatePolygons){
     
   }
   
-  # Climate polygons: Climate is assumed to be homogeneous within polygons
-  # Default source: Canadian ecodistrict
-  if (!suppliedElsewhere('climatePolygons', sim)) {
-    sim$climatePolygons <- prepInputs(
-      targetFile = "ecodistricts.shp",
-      url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/district/ecodistrict_shp.zip",
-      destinationPath = dPath,
-      projectTo = rstTo,
-      fun = "terra::vect"
-    ) |>
-      Cache()
-    sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
-
-    # keeps the polygons that touches the studyarea
-    rel <- terra::relate(
-      sim$climatePolygons,
-      sim$studyArea,
-      relation = "intersects"
-    )
-    poly_indices <- which(rowSums(rel) > 0)
-    sim$climatePolygons <- sim$climatePolygons[poly_indices, ]
-  }
-  
   # Dominant species layer
   # Default source: NTEMS dominant species layer for the 1st year of simulation
   if (!suppliedElsewhere('dominantSpecies', sim)) {
@@ -788,7 +596,37 @@ climatePolygonMap <- function(climatePolygons){
     
   }
   
-  
+  # Climate polygons: Climate is assumed to be homogeneous within polygons
+  # Default source: Canadian ecodistrict
+  if (!suppliedElsewhere('climatePolygons', sim)) {
+    sim$climatePolygons <- prepInputs(
+      targetFile = "ecodistricts.shp",
+      url = "https://sis.agr.gc.ca/cansis/nsdb/ecostrat/district/ecodistrict_shp.zip",
+      destinationPath = dPath,
+      projectTo = rstTo,
+      fun = "terra::vect"
+    ) |>
+      Cache()
+    sim$climatePolygons$climatePolygonId <- sim$climatePolygons$ECODISTRIC
+    
+    # keeps the polygons that touches the studyarea
+    rel <- terra::relate(
+      sim$climatePolygons,
+      sim$studyArea,
+      relation = "intersects"
+    )
+    poly_indices <- which(rowSums(rel) > 0)
+    
+    sim$climatePolygons <- sim$climatePolygons[poly_indices, ]
+    
+    # if dominantSpecie is a raster
+    if (inherits(sim$dominantSpecies, "SpatRaster")){
+      forestedClimatePolygons <- extract(sim$dominantSpecies, sim$climatePolygons, fun = mean, na.rm = TRUE, ID = FALSE)
+      forestedClimatePolygons <- !is.na(forestedClimatePolygons[ ,1])
+      sim$climatePolygons <- sim$climatePolygons[forestedClimatePolygons, ]
+    }
+    
+  }
   
   # Table to link the dominant species to traits of White et al., 2000
   if (!suppliedElsewhere('sppEquiv', sim)) {
