@@ -739,7 +739,8 @@ climatePolygonMap <- function(climatePolygons){
       destinationPath = dPath,
       rstTo = rstTo,
       polyTo = polyTo,
-      year = yearToUse
+      year = yearToUse,
+      treedPixels = treedPixels
     ) |> Cache()
     
   }

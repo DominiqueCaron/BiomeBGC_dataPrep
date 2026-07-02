@@ -441,7 +441,7 @@ prepNfixation <- function(destinationPath, to, treedPixels){
 # Default source: ECC snow water equivalent (SWE) over the Northern Hemisphere
 # Methods: Mudryk et al., 2015: https://doi.org/10.1175/JCLI-D-15-0229.1
 # data is available for 1981-2020
-prepSnowpackWaterContent <- function(destinationPath, rstTo, polyTo, year){
+prepSnowpackWaterContent <- function(destinationPath, rstTo, polyTo, year, treedPixels){
   # Get data
   snowpackWaterContent <- prepInputs(
     targetFile = "swe_monthly_mm_1981-2020.nc",
@@ -451,15 +451,15 @@ prepSnowpackWaterContent <- function(destinationPath, rstTo, polyTo, year){
     cropTo = rstTo,
     overwrite = TRUE
   )
-  
   # Use the average for January of the first year.
-  layerToKeep <- which(terra::time(snowpackWaterContent) == paste(year, "01", "16", sep = "-"))
+  layerToKeep <- which(terra::time(snowpackWaterContent, format = "days") == paste(year, "01", "16", sep = "-"))
   
   snowpackWaterContent <- postProcessTo(
     snowpackWaterContent[[layerToKeep]],
     projectTo = rstTo,
     maskTo = polyTo
   )
+  snowpackWaterContent <- fillMissingValues(snowpackWaterContent, treedPixels, "snowpack water content")
   
   snowpackWaterContent <- round(snowpackWaterContent, -1)
   
